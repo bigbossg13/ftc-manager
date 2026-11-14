@@ -256,7 +256,7 @@
     { id: 'sensors', name: 'Sensor & Odometry Kit', cost: 500, desc: '+20% software progress' },
     { id: 'laptops', name: 'Team Laptops', cost: 700, desc: '+10% software and portfolio' },
     { id: 'pit', name: 'Pit Display & Banner', cost: 300, desc: '+15% outreach and fundraising' },
-    { id: 'space', name: 'Bigger Workshop', cost: 2200, desc: '+1 work block per week, +1 mentor slot' },
+    { id: 'space', name: 'Bigger Workshop', cost: 2200, desc: '+6 team hours per week, +1 mentor slot' },
   ];
 
   /* ---- Vendor products. A few launch each summer and last one season. ---- */

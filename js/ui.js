@@ -80,11 +80,11 @@
     let up;
     if (st.event) up = '<h2>You are at the ' + st.event.name + '</h2><p class="muted">Matches are waiting.</p>' + btn('Go to event', 'tab', 'event', { cls: 'primary big' });
     else if (next) {
-      const wk = next.week - st.week, free = C.blocks() - C.used();
+      const wk = next.week - st.week, free = C.hours() - C.used();
       up = '<h2>' + (st.kickoff ? 'Next: ' + next.name : 'Preseason') + '</h2>' +
         '<p>' + (st.kickoff ? '' : 'Kickoff in <b>' + (D.WEEKS.kickoff - st.week) + '</b> week' + (D.WEEKS.kickoff - st.week === 1 ? '' : 's') + '. ') +
         next.name + ' in <b>' + wk + '</b> week' + (wk === 1 ? '' : 's') + ' (entry ' + U.money(next.fee) + ').</p>' +
-        '<p>Work blocks assigned this week: <b>' + C.used() + ' / ' + C.blocks() + '</b>' + (free ? ' <span class="warn">(' + free + ' idle)</span>' : '') + '</p>' +
+        '<p>Team hours assigned this week: <b>' + C.used() + ' / ' + C.hours() + ' h</b>' + (free ? ' <span class="warn">(' + free + ' h idle)</span>' : '') + '</p>' + hoursBar(false) +
         '<div class="row">' + btn('Plan the week', 'tab', 'workshop') + btn('Advance week ▶', 'advance', undefined, { cls: 'primary big' }) + '</div>';
     } else up = '<h2>Season complete</h2><p class="muted">No more events for the team this season.</p>' + btn('Go to season review ▶', 'advance', undefined, { cls: 'primary big' });
     return '<div class="grid"><div class="card c8 hl">' + up + '</div>' +
@@ -98,34 +98,47 @@
   function stepper(id) {
     const st = G.state, n = st.alloc[id] || 0, lock = C.locked(id);
     if (lock) return '<span class="muted">' + lock + '</span>';
-    return '<span class="step">' + btn('−', 'alloc', id + ':-1', { off: n <= 0 }) + '<b>' + n + '</b>' + btn('+', 'alloc', id + ':1', { off: C.used() >= C.blocks() }) + '</span>';
+    return '<span class="step">' + btn('−', 'alloc', id + ':-5', { off: n <= 0, title: 'Remove 5 hours' }) +
+      '<input class="hrs" type="number" min="0" step="1" inputmode="numeric" aria-label="Hours" data-c="hours" data-v="' + id + '" value="' + n + '"><span class="muted">h</span>' +
+      btn('+', 'alloc', id + ':5', { off: C.used() >= C.hours(), title: 'Add 5 hours' }) + '</span>';
   }
+  const ACT_COLORS = { drive: '#f57e25', intake: '#f0c33d', scorer: '#e5484d', endgame: '#d6409f', software: '#8e6cf0', test: '#3e7bfa', practice: '#2bb8c4', portfolio: '#46c37b', outreach: '#9bd44a', fundraise: '#c9a36b', training: '#9aa5b8' };
+  const actName = (id) => (D.sub(id) || D.ACTS.find((a) => a.id === id)).name;
+  /** The week's team hours as one stacked bar, a segment per job. */
+  function hoursBar(legend) {
+    const st = G.state, total = C.hours(), ids = Object.keys(ACT_COLORS).filter((id) => st.alloc[id] > 0), free = total - C.used();
+    return '<div class="hbar" role="img" aria-label="Team hours this week">' + ids.map((id) => '<i style="width:' + st.alloc[id] / total * 100 + '%;background:' + ACT_COLORS[id] + '" title="' + actName(id) + ': ' + st.alloc[id] + ' h">' + (st.alloc[id] / total > 0.07 ? st.alloc[id] + 'h' : '') + '</i>').join('') +
+      (free > 0 ? '<i class="free" style="width:' + free / total * 100 + '%" title="Idle: ' + free + ' h">' + (free / total > 0.1 ? free + 'h idle' : '') + '</i>' : '') + '</div>' +
+      (legend ? '<div class="hlegend">' + ids.map((id) => '<span><i style="background:' + ACT_COLORS[id] + '"></i>' + actName(id) + ' ' + st.alloc[id] + ' h</span>').join('') + (free > 0 ? '<span><i class="free"></i>Idle ' + free + ' h</span>' : '') + '</div>' : '');
+  }
+  const projHours = (id) => { const std = C.baseHours(id), mine = C.levelWork(id); return mine < std ? mine + ' h (standard ' + std + ' h)' : std + ' h project'; };
   function workshop() {
     const st = G.state;
+    const effRow = [['mech', 'Mechanical', 'drive'], ['soft', 'Software', 'software'], ['drive', 'Driving', 'practice'], ['biz', 'Business', 'outreach']].map((x) => '<span class="tag">' + x[1] + ' ×' + C.eff(x[2]).toFixed(2) + '</span>').join(' ');
     const subs = D.SUBS.map((s) => {
       const r = st.robot.subs[s.id], c = C.concept(s.id), n = st.alloc[s.id] || 0;
       let proj;
       if (r.active) {
-        const need = C.levelWork(s.id), eta = n ? Math.ceil((need - r.progress) / (n * C.ppb(s.id))) : 0;
-        proj = '<div>Building level ' + (r.level + 1) + '</div>' + bar(r.progress / need * 100) + '<div class="muted">' + Math.round(r.progress) + ' / ' + need + ' work' + (n ? ' · about ' + eta + ' wk' : ' · no one assigned') + '</div>';
+        const need = C.levelWork(s.id), eta = n ? Math.ceil((need - r.progress) / (n * C.eff(s.id))) : 0;
+        proj = '<div>Building level ' + (r.level + 1) + '</div>' + bar(r.progress / need * 100) + '<div class="muted">' + Math.floor(r.progress) + ' / ' + need + ' h' + (n ? ' · about ' + eta + ' wk' : ' · no hours assigned') + '</div>';
       } else {
         const why = C.canUpgrade(s.id);
         proj = why === 'Maxed out' ? '<span class="tag a">Maxed out</span>' : btn('Start level ' + (r.level + 1) + ' · ' + U.money(C.levelCost(s.id)), 'upgrade', s.id, { off: !!why, title: why, cls: why ? '' : 'primary' }) +
-          '<div class="muted">' + (why && why !== 'In progress' ? why : C.levelWork(s.id) + ' work') + '</div>';
+          '<div class="muted">' + (why && why !== 'In progress' ? why : projHours(s.id)) + '</div>';
       }
-      return '<tr><td><b>' + s.name + '</b><div class="muted">' + s.stat + ' ' + C.stat(s.id) + '</div></td>' +
+      return '<tr><td><b><i class="dot" style="background:' + ACT_COLORS[s.id] + '"></i>' + s.name + '</b><div class="muted">' + s.stat + ' ' + C.stat(s.id) + '</div></td>' +
         '<td><select data-c="concept" data-v="' + s.id + '">' + s.concepts.map((x) => '<option value="' + x.id + '"' + (x.id === c.id ? ' selected' : '') + '>' + C.conceptName(s.id, x) + ' (max ' + (x.base + x.per * x.max) + ')</option>').join('') + '</select><div class="muted">' + c.desc + '</div></td>' +
         '<td>' + pips(r.level, c.max) + '<div class="muted">Level ' + r.level + ' / ' + c.max + '</div></td><td style="min-width:170px">' + proj + '</td><td class="right">' + stepper(s.id) + '</td></tr>';
     }).join('');
     const acts = D.ACTS.map((a) => {
-      const n = st.alloc[a.id] || 0, per = C.ppb(a.id);
-      const fx = { test: '+' + (per * 0.2).toFixed(1) + ' reliability', practice: '+' + (per * 0.22).toFixed(1) + ' practice', portfolio: '+' + (per * 0.13).toFixed(1) + ' portfolio',
-        outreach: '+' + (per * 0.13).toFixed(1) + ' outreach', fundraise: '+' + U.money(C.fundPerBlock()), training: 'skill gains for 2 students' }[a.id];
-      return '<tr><td><b>' + a.name + '</b><div class="muted">' + a.desc + '</div></td><td class="muted">' + fx + ' per block' + '</td><td class="right">' + stepper(a.id) + '</td></tr>';
+      const per = C.eff(a.id) * 10;
+      const fx = a.id === 'training' ? 'about 3 skill gains' : a.id === 'fundraise' ? '+' + U.money(C.fundPerHour() * 10) : '+' + (per * C.RATE[a.id]).toFixed(1) + ' ' + { test: 'reliability', practice: 'practice', portfolio: 'portfolio', outreach: 'outreach' }[a.id];
+      return '<tr><td><b><i class="dot" style="background:' + ACT_COLORS[a.id] + '"></i>' + a.name + '</b><div class="muted">' + a.desc + '</div></td><td class="muted">' + fx + ' per 10 h' + '</td><td class="right">' + stepper(a.id) + '</td></tr>';
     }).join('');
-    return '<div class="grid"><div class="card c12"><div class="row spread"><div><h2>This week\'s plan</h2><span class="muted">Each student-team work block goes to one job. Blocks assigned: </span><b>' + C.used() + ' / ' + C.blocks() + '</b></div>' +
-      '<div class="row"><span class="muted">Overtime (+3 blocks, costs morale)</span>' + seg('overtime', st.overtime ? '1' : '0', [['0', 'Off'], ['1', 'On']]) + '</div></div></div>' +
-      '<div class="card c12"><h3>Robot' + (st.kickoff ? ' · ' + D.game(st.game).name : '') + '</h3><div class="scroll"><table><tr><th>Subsystem</th><th>Design concept</th><th>Level</th><th>Project</th><th class="right">Blocks</th></tr>' + subs + '</table></div>' +
+    return '<div class="grid"><div class="card c12"><div class="row spread"><div><h2>This week\'s plan</h2><span class="muted">Team hours assigned: </span><b>' + C.used() + ' / ' + C.hours() + ' h</b></div>' +
+      '<div class="row"><span class="muted">Overtime (+18 h, costs morale)</span>' + seg('overtime', st.overtime ? '1' : '0', [['0', 'Off'], ['1', 'On']]) + '</div></div>' + hoursBar(true) +
+      '<p class="muted" style="margin-top:10px">Type hours into any job, or use − and + for steps of 5. Efficiency is how much standard work one of your hours gets done: ' + effRow + '</p></div>' +
+      '<div class="card c12"><h3>Robot' + (st.kickoff ? ' · ' + D.game(st.game).name : '') + '</h3><div class="scroll"><table><tr><th>Subsystem</th><th>Design concept</th><th>Level</th><th>Project</th><th class="right">Hours this week</th></tr>' + subs + '</table></div>' +
       '<p class="muted" style="margin-top:8px">Changing a concept halves that subsystem\'s level. Experience with a concept carries into future seasons and makes it quicker to build.</p></div>' +
       '<div class="card c8"><h3>Other work</h3><div class="scroll"><table>' + acts + '</table></div></div>' +
       '<div class="card c4"><h3>Readiness</h3>' + stat('Reliability', st.robot.rel, relCls(st.robot.rel)) + stat('Practice', st.practice, 'b') + stat('Portfolio', st.awards.portfolio, 'g') + stat('Outreach', st.awards.outreach, 'g') +
@@ -270,8 +283,8 @@
     return '<div class="card help"><h2 style="margin-top:0">How to play</h2><p>You manage a robotics team across many seasons. Each turn is one week.</p>' +
       '<h2>The season</h2><ul><li><b>Preseason (weeks 1-2):</b> raise money, pitch sponsors, invite mentors, train students.</li><li><b>Kickoff (week ' + D.WEEKS.kickoff + '):</b> the game is revealed. Read the scoring: every game rewards different robots.</li>' +
       '<li><b>Build and compete:</b> Qualifiers in weeks ' + D.WEEKS.q1 + ' and ' + D.WEEKS.q2 + ' (or, in a league region, three meets and a League Tournament). Advance from either to the Regional Championship (week ' + D.WEEKS.regional + '), and from there to the World Championship (week ' + D.WEEKS.worlds + '). You keep improving the robot between events.</li></ul>' +
-      '<h2>The workshop</h2><ul><li>Each week you have a number of <b>work blocks</b>. Assign them to subsystem projects and other jobs.</li><li>Pick a <b>design concept</b> per subsystem. Simple concepts are cheap and fast but top out early. Advanced ones cost more money and work.</li>' +
-      '<li>Every upgrade costs <b>reliability</b>. Spend blocks on Test & Tune before an event or watch your robot die on the field.</li><li><b>Driver practice</b> makes cycles faster and penalties rarer.</li></ul>' +
+      '<h2>The workshop</h2><ul><li>Each week the team has a pool of <b>hours</b>, shown as one bar. Split them between subsystem projects and other jobs by typing hours in.</li><li>Every project has a <b>standard number of hours</b>. Your efficiency in that discipline (skills, mentors, equipment, morale) decides how much of it one of your hours gets done.</li><li>Pick a <b>design concept</b> per subsystem. Simple concepts are cheap and fast but top out early. Advanced ones cost more money and work.</li>' +
+      '<li>Every upgrade costs <b>reliability</b>. Spend hours on Test & Tune before an event or watch your robot die on the field.</li><li><b>Driver practice</b> makes cycles faster and penalties rarer.</li></ul>' +
       '<h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
       '<li>Playoffs are best-of-three semifinals and a final.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. Nominate a mentor on the Team screen for the Compass Award. A great portfolio and outreach record can carry a team with an average robot.</li>' +
       '<li>During a live match you can make <b>coach calls</b>: push for speed at the risk of breakdowns and penalties, play it safe, or send the robot to the endgame early.</li></ul>' +
@@ -333,19 +346,19 @@
       C.newGame({ name: UI.name.trim() || 'Robo Rookies', number: U.clamp(parseInt(UI.num, 10) || 12345, 1, 99999), difficulty: UI.diff, mode: UI.mode, format: UI.format, game: UI.game });
       UI.tab = 'hq';
     },
-    continue() { if (G.load()) UI.tab = G.state.event ? 'event' : 'hq'; },
+    continue() { if (G.load()) { C.migrate(G.state); UI.tab = G.state.event ? 'event' : 'hq'; } },
     wipe() { if (confirm('Delete your saved career? This cannot be undone.')) { V.stop(); G.wipe(); G.state = null; Object.assign(UI, { need: null, live: null, result: null }); } },
     tab(v) { UI.tab = v; },
     advance() {
-      const st = G.state, free = C.blocks() - C.used();
-      if (st.phase !== 'review' && C.nextEvent() && free > 0 && !confirm(free + ' work block' + (free === 1 ? ' is' : 's are') + ' unassigned this week. Advance anyway?')) { UI.tab = 'workshop'; return; }
+      const st = G.state, free = C.hours() - C.used();
+      if (st.phase !== 'review' && C.nextEvent() && free > 0 && !confirm(free + ' team hour' + (free === 1 ? ' is' : 's are') + ' unassigned this week. Advance anyway?')) { UI.tab = 'workshop'; return; }
       const out = C.advanceWeek();
       if (out === 'event') UI.tab = 'event';
       else if (out === 'kickoff') UI.tab = 'workshop';
     },
     alloc(v) { const [id, d] = v.split(':'); C.setAlloc(id, +d); },
     overtime(v) { G.state.overtime = v === '1'; C.sanitizeAlloc(); },
-    upgrade(v) { if (C.startUpgrade(v) && C.used() < C.blocks()) C.setAlloc(v, 1); },
+    upgrade(v) { if (C.startUpgrade(v)) C.setAlloc(v, 10); },
     invite(v) { C.invite(+v); },
     dismiss(v) { C.dismiss(+v); },
     pitch(v) { C.pitch(+v); },
@@ -385,6 +398,7 @@
   document.addEventListener('change', (ev) => {
     const any = ev.target.closest('[data-c]');
     if (any && any.dataset.c === 'game') { UI.game = any.value; return; }
+    if (any && any.dataset.c === 'hours') { C.setHours(any.dataset.v, any.value); G.save(); UI.render(); return; }
     if (any && any.dataset.c === 'role') { C.setRole(any.dataset.v, any.value); G.save(); UI.render(); return; }
     const el = ev.target.closest('[data-c="concept"]');
     if (!el) return;

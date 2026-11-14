@@ -16,7 +16,7 @@ The game autosaves to the browser's local storage.
 - **A new game every season**, revealed at kickoff, each with different scoring, field layouts and endgames, so the best robot changes from year to year.
 - **Two region formats.** Qualifiers, or league play: three league meets with carried-over standings, then a League Tournament.
 - **Robot design.** Five subsystems (drivetrain, intake, scoring mechanism, endgame, software), each with three design concepts that trade cost and build time against their ceiling. Experience with a concept carries into later seasons.
-- **Weekly planning.** Split the team's work blocks between building, testing, driver practice, the engineering portfolio, outreach, fundraising and training.
+- **Weekly planning.** Split the team's weekly hours, shown as one stacked bar, between building, testing, driver practice, the engineering portfolio, outreach, fundraising and training.
 - **Events.** Qualifiers, a Regional Championship and a World Championship with qualification matches, rankings, alliance selection, best-of-three playoffs, judged awards (Inspire, Think, Connect, Design, and the Compass Award for a mentor you nominate) and advancement. Wins and top awards hang orange banners on the Season screen.
 - **Summer vendor launches.** A few new products each preseason that boost or cheapen one subsystem for that season.
 - **Four-person drive team:** driver, operator, drive coach and human player.

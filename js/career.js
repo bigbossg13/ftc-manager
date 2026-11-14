@@ -66,6 +66,13 @@
   const perk = (subId, kind) => D.VENDOR.reduce((a, x) => a + (G.state.perks[x.id] && x.sub === subId && x.kind === kind ? x.value : 0), 0);
   const goalIndex = (rep) => (rep < 28 ? 0 : rep < 50 ? 1 : rep < 72 ? 2 : 3);
 
+  /** Older saves counted work in blocks and points; convert them to hours. */
+  C.migrate = function (st) {
+    if (st.v >= 3) return;
+    Object.keys(st.alloc).forEach((id) => { st.alloc[id] *= 6; });
+    Object.values(st.robot.subs).forEach((s) => { s.progress = s.progress / 2.667; });
+    st.v = 3;
+  };
   C.news = function (text) {
     const st = G.state;
     st.news.unshift({ s: st.season, w: st.week, text });
@@ -78,7 +85,7 @@
   C.newGame = function (opts) {
     const diff = D.DIFFICULTY[opts.difficulty] || D.DIFFICULTY.normal;
     const st = (G.state = {
-      v: 2, seed: (opts.seed || Date.now()) >>> 0, difficulty: opts.difficulty,
+      v: 3, seed: (opts.seed || Date.now()) >>> 0, difficulty: opts.difficulty,
       mode: opts.mode === 'single' ? 'single' : 'career', format: opts.format === 'league' ? 'league' : 'qual', order: [],
       banners: [], compass: null, vendor: [], perks: {}, league: null,
       team: { name: opts.name || 'Robo Rookies', number: opts.number || 31415, rep: diff.rep, money: diff.money },
@@ -116,10 +123,16 @@
     return s.level === 0 ? 12 : Math.min(100, c.base + c.per * s.level + perk(subId, 'stat'));
   };
   C.levelCost = function (subId) { const s = G.state.robot.subs[subId]; return Math.round(C.concept(subId).cost * (1 + 0.35 * s.level) * (1 - perk(subId, 'cost'))); };
+  /** Standard hours for the next level of a concept: the same for every team, in steps of 5. */
+  C.baseHours = function (subId) {
+    const s = G.state.robot.subs[subId];
+    return Math.max(5, Math.round(10 * C.concept(subId).work * (1 + 0.45 * s.level) / 5) * 5);
+  };
+  /** Hours this team needs: the standard figure less experience with the concept and vendor kits. */
   C.levelWork = function (subId) {
     const s = G.state.robot.subs[subId];
     const know = Math.min(7, G.state.knowledge[subId + ':' + s.concept] || 0);
-    return Math.round(28 * C.concept(subId).work * (1 + 0.45 * s.level) * (1 - 0.04 * know) * (1 - perk(subId, 'work')));
+    return Math.max(1, Math.round(C.baseHours(subId) * (1 - 0.04 * know) * (1 - perk(subId, 'work'))));
   };
   C.canUpgrade = function (subId) {
     const st = G.state, s = st.robot.subs[subId];
@@ -171,9 +184,10 @@
   };
 
   /* ---------- Weekly work ---------- */
-  C.blocks = function () {
+  /** Team hours available this week. */
+  C.hours = function () {
     const st = G.state;
-    return Math.round(st.students.length * 0.8) + 2 + (st.facilities.space ? 1 : 0) + (st.overtime ? 3 : 0);
+    return st.students.length * 5 + 10 + (st.facilities.space ? 6 : 0) + (st.overtime ? 18 : 0);
   };
   C.used = () => Object.values(G.state.alloc).reduce((a, b) => a + b, 0);
   C.locked = function (id) {
@@ -187,13 +201,14 @@
     const st = G.state;
     if (C.locked(id)) return;
     const cur = st.alloc[id] || 0;
-    const next = U.clamp(cur + delta, 0, cur + C.blocks() - C.used());
-    st.alloc[id] = next;
+    st.alloc[id] = U.clamp(Math.round(cur + delta), 0, cur + C.hours() - C.used());
   };
+  /** Set an activity's hours outright (typed in); capped at what is still free. */
+  C.setHours = function (id, value) { C.setAlloc(id, (Math.round(+value) || 0) - (G.state.alloc[id] || 0)); };
   C.sanitizeAlloc = function () {
     const st = G.state;
     Object.keys(st.alloc).forEach((id) => { if (C.locked(id)) st.alloc[id] = 0; });
-    let over = C.used() - C.blocks();
+    let over = C.used() - C.hours();
     Object.keys(st.alloc).reverse().forEach((id) => { const cut = Math.min(over, st.alloc[id]); if (cut > 0) { st.alloc[id] -= cut; over -= cut; } });
   };
   C.skillAvg = function (k) {
@@ -208,15 +223,17 @@
     outreach: { pit: 0.15 }, fundraise: { pit: 0.15 }, training: {},
   };
   C.actSkill = (id) => (D.sub(id) ? D.sub(id).skill : D.ACTS.find((a) => a.id === id).skill);
-  /** Work points one block produces for an activity. */
-  C.ppb = function (id) {
+  /** Efficiency: how much progress one assigned hour makes (1.0 = one standard hour). */
+  C.eff = function (id) {
     const st = G.state, k = C.actSkill(id);
     let fac = 0;
     Object.keys(FAC[id]).forEach((f) => { if (st.facilities[f]) fac += FAC[id][f]; });
     const skill = k ? C.skillAvg(k) : 50;
-    return 16 * (0.5 + skill / 100) * (1 + (k ? C.mentorBonus(k) : 0)) * (1 + fac) * (0.7 + 0.3 * st.morale / 100);
+    return (0.5 + skill / 100) * (1 + (k ? C.mentorBonus(k) : 0)) * (1 + fac) * (0.7 + 0.3 * st.morale / 100);
   };
-  C.fundPerBlock = () => Math.round(C.ppb('fundraise') * (3.5 + G.state.team.rep * 0.06));
+  /** What one hour of each side activity produces. */
+  C.RATE = { test: 0.53, practice: 0.59, portfolio: 0.35, outreach: 0.35 };
+  C.fundPerHour = () => C.eff('fundraise') * (9.3 + G.state.team.rep * 0.16);
 
   function grow(k, amount) {
     const s = U.pick(G.state.students);
@@ -230,8 +247,9 @@
     Object.keys(st.alloc).forEach((id) => {
       const n = st.alloc[id];
       if (!n) return;
-      const p = n * C.ppb(id), sub = st.robot.subs[id];
-      for (let i = 0; i < n; i++) { if (id === 'training') { grow(null, 1); grow(null, 1); } else grow(C.actSkill(id), 0.25); }
+      const p = n * C.eff(id), sub = st.robot.subs[id];
+      if (id === 'training') for (let i = 0; i < Math.round(n / 3); i++) grow(null, 1);
+      else for (let i = 0; i < Math.round(n / 6); i++) grow(C.actSkill(id), 0.25);
       if (sub) {
         sub.progress += p;
         if (sub.progress >= C.levelWork(id)) {
@@ -242,11 +260,11 @@
           st.knowledge[key] = Math.max(st.knowledge[key] || 0, sub.level);
           C.news(D.sub(id).name + ' upgraded to level ' + sub.level + ' (' + C.conceptName(id) + ').');
         }
-      } else if (id === 'test') st.robot.rel = Math.min(96, st.robot.rel + p * 0.2);
-      else if (id === 'practice') st.practice = Math.min(100, st.practice + p * 0.22);
-      else if (id === 'portfolio') st.awards.portfolio = Math.min(100, st.awards.portfolio + p * 0.13);
-      else if (id === 'outreach') { st.awards.outreach = Math.min(100, st.awards.outreach + p * 0.13); C.rep(p * 0.008); }
-      else if (id === 'fundraise') C.earn(n * C.fundPerBlock());
+      } else if (id === 'test') st.robot.rel = Math.min(96, st.robot.rel + p * C.RATE.test);
+      else if (id === 'practice') st.practice = Math.min(100, st.practice + p * C.RATE.practice);
+      else if (id === 'portfolio') st.awards.portfolio = Math.min(100, st.awards.portfolio + p * C.RATE.portfolio);
+      else if (id === 'outreach') { st.awards.outreach = Math.min(100, st.awards.outreach + p * C.RATE.outreach); C.rep(p * 0.021); }
+      else if (id === 'fundraise') C.earn(Math.round(n * C.fundPerHour()));
     });
   }
 

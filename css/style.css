@@ -114,5 +114,11 @@ canvas#field { width: 100%; max-width: 560px; aspect-ratio: 1; display: block; m
 .gamecard canvas { width: 100%; aspect-ratio: 1; border-radius: 5px; background: #262b34; display: block; }
 .gamecard.on { background: #f57e2522; border-color: var(--accent); color: var(--text); font-weight: 400; }
 .gamecard .muted { font-size: 11px; }
+.hbar { display: flex; height: 26px; border-radius: 8px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); margin-top: 10px; }
+.hbar i { display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 12px; font-weight: 700; color: #14100a; white-space: nowrap; overflow: hidden; min-width: 2px; border-right: 1px solid #0006; }
+.hbar i.free, .hlegend i.free { background: repeating-linear-gradient(45deg, #1b212c, #1b212c 6px, #232b38 6px, #232b38 12px); color: var(--muted); font-weight: 400; }
+.hlegend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.hlegend i, i.dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: baseline; }
+input.hrs { width: 58px; text-align: right; padding: 5px 6px; font-variant-numeric: tabular-nums; }
 .help h2 { margin-top: 18px; } .help li { margin: 4px 0; }
 footer { max-width: 1180px; margin: 10px auto 30px; padding: 0 16px; color: var(--muted); font-size: 12px; }

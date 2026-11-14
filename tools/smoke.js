@@ -17,16 +17,16 @@ function botWeek() {
   if (st.mentors.length && !st.compass) C.nominate(0);
   st.vendor.forEach((id) => { if (st.team.money > 2500) C.buyPerk(id); });
   st.alloc = {};
-  if (!st.kickoff) { C.setAlloc('fundraise', 3); C.setAlloc('training', 99); return; }
+  if (!st.kickoff) { C.setAlloc('fundraise', 18); C.setAlloc('training', 999); return; }
   D.SUBS.forEach((s) => C.startUpgrade(s.id));
   const active = D.SUBS.filter((s) => st.robot.subs[s.id].active).map((s) => s.id);
-  C.setAlloc('test', st.robot.rel < 75 ? 2 : 1);
-  C.setAlloc('practice', 1);
-  C.setAlloc('portfolio', 1);
-  if (st.team.money < 600) C.setAlloc('fundraise', 2);
+  C.setAlloc('test', st.robot.rel < 75 ? 12 : 6);
+  C.setAlloc('practice', 6);
+  C.setAlloc('portfolio', 6);
+  if (st.team.money < 600) C.setAlloc('fundraise', 12);
   let i = 0, guard = 0;
-  while (active.length && C.used() < C.blocks() && guard++ < 50) C.setAlloc(active[i++ % active.length], 1);
-  C.setAlloc('outreach', 99);
+  while (active.length && C.used() < C.hours() && guard++ < 80) C.setAlloc(active[i++ % active.length], 6);
+  C.setAlloc('outreach', 999);
 }
 
 function playEvent() {
