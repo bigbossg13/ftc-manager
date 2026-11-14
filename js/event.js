@@ -3,14 +3,16 @@
   'use strict';
   const U = G.U, D = G.Data;
   const E = (G.Event = {});
-  const SLOTS = { qual: 6, regional: 5, worlds: 0 };
-  const ROUNDS = { qual: 5, regional: 6, worlds: 6 };
+  const SLOTS = { qual: 6, league: 5, regional: 5, worlds: 0 };
+  const ROUNDS = { qual: 5, meet: 5, league: 5, regional: 6, worlds: 6 };
 
   /** entries: [{ id, num, name, perf?, port, out, isPlayer? }], count divisible by 4 */
-  E.create = function (type, name, entries) {
+  E.create = function (type, name, entries, carried) {
     const ev = { type, name, teams: entries, stage: 'quals', mi: 0, schedule: [], stats: {}, feed: [],
       sel: null, alliances: null, series: null, awards: null, advancing: [], summary: null, playerPick: null };
-    entries.forEach((t) => { ev.stats[t.id] = { w: 0, l: 0, t: 0, rp: 0, pf: 0, n: 0, contrib: 0 }; });
+    // League play: standings carry over from earlier meets.
+    entries.forEach((t) => { ev.stats[t.id] = Object.assign({ w: 0, l: 0, t: 0, rp: 0, pf: 0, n: 0, contrib: 0 }, carried && carried[t.id]); });
+    ev.before = Object.assign({}, ev.stats.P);
     const ids = entries.map((t) => t.id);
     let n = 1;
     for (let r = 0; r < ROUNDS[type]; r++) {
@@ -111,6 +113,10 @@
     give('Think Award', (id) => val(id, 'port'));
     give('Connect Award', (id) => val(id, 'out'));
     give('Design Award', (id) => robot(id));
+    // Compass Award: recognises an adult mentor, so it does not use up a team award.
+    const nominee = G.state.mentors.find((x) => x.name === G.state.compass);
+    done.length = 0;
+    give('Compass Award', (id) => (E.team(ev, id).isPlayer ? (nominee ? nominee.skill * 11 + val(id, 'out') * 0.45 : -99) : val(id, 'out') * 0.5 + val(id, 'port') * 0.3));
 
     const f = ev.series[2], win = f.wa === 2 ? f.a : f.b, lose = f.wa === 2 ? f.b : f.a;
     const adv = [ev.awards[0].id].concat(ev.alliances[win], ev.alliances[lose], [ev.awards[1].id], order);
@@ -131,6 +137,14 @@
   E.advance = function (ev) {
     for (;;) {
       if (ev.stage === 'quals') {
+        if (ev.mi >= ev.schedule.length && ev.type === 'meet') {
+          const s = ev.stats.P, b = ev.before;
+          ev.summary = { rank: E.rankings(ev).indexOf('P') + 1, of: ev.teams.length, record: (s.w - b.w) + '-' + (s.l - b.l) + '-' + (s.t - b.t),
+            wins: s.w - b.w, losses: s.l - b.l, seed: 0, result: 'League meet', awards: [], advanced: false };
+          ev.feed.push('Meet complete. Standings carry forward to the League Tournament.');
+          ev.stage = 'done';
+          continue;
+        }
         if (ev.mi >= ev.schedule.length) {
           ev.stage = 'selection';
           ev.sel = { order: E.rankings(ev), alliances: [] };

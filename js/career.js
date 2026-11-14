@@ -17,14 +17,21 @@
     D.SUBS.forEach((s) => { subs[s.id] = { concept: s.concepts[1].id, level: 0, progress: 0, active: false }; });
     return { subs, rel: 70 };
   }
-  function calendar() {
+  function calendar(format) {
     const w = D.WEEKS;
-    return [
+    const first = format === 'league' ? [
+      { week: 8, type: 'meet', name: 'League Meet 1', fee: 40 },
+      { week: 10, type: 'meet', name: 'League Meet 2', fee: 40 },
+      { week: 12, type: 'meet', name: 'League Meet 3', fee: 40 },
+      { week: 14, type: 'league', name: 'League Tournament', fee: 150 },
+    ] : [
       { week: w.q1, type: 'qual', name: 'Autumn Qualifier', fee: 150 },
       { week: w.q2, type: 'qual', name: 'Winter Qualifier', fee: 150 },
+    ];
+    return first.concat([
       { week: w.regional, type: 'regional', name: 'Regional Championship', fee: 400, need: 'qualRegional' },
       { week: w.worlds, type: 'worlds', name: 'World Championship', fee: 3500, need: 'qualWorlds' },
-    ];
+    ]);
   }
   function makeOffers(st) {
     const names = U.shuffle(D.SPONSORS).slice(0, 5);
@@ -40,9 +47,23 @@
     });
   }
   function pickGame(st) {
-    const opts = D.GAMES.filter((g) => g.id !== st.game);
-    return U.pick(opts).id;
+    if (st.order[st.season - 1]) return st.order[st.season - 1];
+    return U.pick(D.GAMES.filter((g) => g.id !== st.game)).id;
   }
+  /** Everything that is rebuilt at the start of each season. */
+  function setupSeason(st) {
+    st.game = pickGame(st);
+    st.calendar = calendar(st.format);
+    st.goal = goalIndex(st.team.rep);
+    st.offers = makeOffers(st);
+    st.mentorPool = makeMentors();
+    st.vendor = U.shuffle(D.VENDOR).slice(0, 3).map((x) => x.id);
+    st.perks = {};
+    st.league = st.format === 'league' ? { ids: U.shuffle(st.world.teams).slice(0, 15).map((t) => t.id), stats: null } : null;
+    C.autoDriveTeam();
+  }
+  C.yearLabel = (y) => y + '-' + String((y + 1) % 100).padStart(2, '0');
+  const perk = (subId, kind) => D.VENDOR.reduce((a, x) => a + (G.state.perks[x.id] && x.sub === subId && x.kind === kind ? x.value : 0), 0);
   const goalIndex = (rep) => (rep < 28 ? 0 : rep < 50 ? 1 : rep < 72 ? 2 : 3);
 
   C.news = function (text) {
@@ -57,22 +78,26 @@
   C.newGame = function (opts) {
     const diff = D.DIFFICULTY[opts.difficulty] || D.DIFFICULTY.normal;
     const st = (G.state = {
-      v: 1, seed: (opts.seed || Date.now()) >>> 0, difficulty: opts.difficulty,
+      v: 2, seed: (opts.seed || Date.now()) >>> 0, difficulty: opts.difficulty,
+      mode: opts.mode === 'single' ? 'single' : 'career', format: opts.format === 'league' ? 'league' : 'qual', order: [],
+      banners: [], compass: null, vendor: [], perks: {}, league: null,
       team: { name: opts.name || 'Robo Rookies', number: opts.number || 31415, rep: diff.rep, money: diff.money },
-      season: 1, year: 2026, week: 1, phase: 'play', game: null, kickoff: false,
+      season: 1, year: 2022, week: 1, phase: 'play', game: null, kickoff: false,
       students: [], mentors: [], mentorPool: [], facilities: {}, sponsors: [], offers: [],
       robot: freshRobot(), knowledge: {}, practice: 0, morale: 75, overtime: false, alloc: {},
       awards: { portfolio: 0, outreach: 0 }, driveTeam: {}, plan: { auto: 'std', focus: 'high', end: 'normal' },
-      world: null, calendar: calendar(), event: null, flags: {}, news: [], history: [],
+      world: null, calendar: [], event: null, flags: {}, news: [], history: [],
       ledger: { income: 0, spent: 0 }, pitched: false, review: null, goal: 0, modal: null,
     });
     [9, 9, 10, 10, 10, 11, 11, 12].forEach((g) => st.students.push(student(g, 14 + (g - 9) * 5, 34 + (g - 9) * 7)));
     st.world = G.World.create(st.team.number);
-    st.game = pickGame(st);
-    st.goal = goalIndex(st.team.rep);
-    st.offers = makeOffers(st);
-    st.mentorPool = makeMentors();
-    C.autoDriveTeam();
+    if (st.mode === 'single') {
+      const g = D.game(opts.game) || D.GAMES[0];
+      st.order = [g.id];
+      st.year = g.year || 2026;
+    } else st.order = D.REAL.map((g) => g.id).concat(U.shuffle(D.SIM).map((g) => g.id));
+    setupSeason(st);
+    C.news('Summer vendor launches are in: see Finance for this year\'s new products.');
     C.news('Team ' + st.team.number + ' ' + st.team.name + ' is founded. Kickoff is in week ' + D.WEEKS.kickoff + '.');
     return st;
   };
@@ -87,13 +112,13 @@
   };
   C.stat = function (subId) {
     const s = G.state.robot.subs[subId], c = C.concept(subId);
-    return s.level === 0 ? 12 : Math.min(100, c.base + c.per * s.level);
+    return s.level === 0 ? 12 : Math.min(100, c.base + c.per * s.level + perk(subId, 'stat'));
   };
-  C.levelCost = function (subId) { const s = G.state.robot.subs[subId]; return Math.round(C.concept(subId).cost * (1 + 0.35 * s.level)); };
+  C.levelCost = function (subId) { const s = G.state.robot.subs[subId]; return Math.round(C.concept(subId).cost * (1 + 0.35 * s.level) * (1 - perk(subId, 'cost'))); };
   C.levelWork = function (subId) {
     const s = G.state.robot.subs[subId];
     const know = Math.min(7, G.state.knowledge[subId + ':' + s.concept] || 0);
-    return Math.round(28 * C.concept(subId).work * (1 + 0.45 * s.level) * (1 - 0.04 * know));
+    return Math.round(28 * C.concept(subId).work * (1 + 0.45 * s.level) * (1 - 0.04 * know) * (1 - perk(subId, 'work')));
   };
   C.canUpgrade = function (subId) {
     const st = G.state, s = st.robot.subs[subId];
@@ -119,19 +144,29 @@
   };
   C.driverSkill = function () {
     const st = G.state, dt = st.driveTeam;
-    const d = st.students.find((s) => s.id === dt.driver), o = st.students.find((s) => s.id === dt.operator);
-    const skill = ((d ? d.drive : 10) * 0.6 + (o ? o.drive : 10) * 0.4);
+    const val = (role) => { const s = st.students.find((x) => x.id === dt[role]); return s ? s.drive : 10; };
+    const skill = val('driver') * 0.5 + val('operator') * 0.25 + val('coach') * 0.15 + val('human') * 0.1;
     return Math.round(U.clamp(0.45 * skill + 0.45 * st.practice + 40 * C.mentorBonus('drive') + 5, 5, 100));
   };
   C.playerPerf = function () {
     return { speed: C.stat('drive'), intake: C.stat('intake'), scorer: C.stat('scorer'), endgame: C.stat('endgame'),
       auto: C.stat('software'), rel: Math.round(G.state.robot.rel), driver: C.driverSkill() };
   };
+  C.ROLES = ['driver', 'operator', 'coach', 'human'];
+  C.ROLE_NAMES = { driver: 'Driver', operator: 'Operator', coach: 'Drive Coach', human: 'Human Player' };
+  C.setRole = function (studentId, role) {
+    const dt = G.state.driveTeam;
+    const old = C.ROLES.find((r) => dt[r] === studentId);
+    if (old) dt[old] = role ? dt[role] : null;
+    if (role) dt[role] = studentId;
+  };
   C.autoDriveTeam = function () {
-    const st = G.state, by = st.students.slice().sort((a, b) => b.drive - a.drive);
-    const has = (id) => st.students.some((s) => s.id === id);
-    if (!has(st.driveTeam.driver)) st.driveTeam.driver = (by.find((s) => s.id !== st.driveTeam.operator) || {}).id;
-    if (!has(st.driveTeam.operator)) st.driveTeam.operator = (by.find((s) => s.id !== st.driveTeam.driver) || {}).id;
+    const st = G.state, dt = st.driveTeam, by = st.students.slice().sort((a, b) => b.drive - a.drive);
+    C.ROLES.forEach((role) => {
+      if (st.students.some((s) => s.id === dt[role])) return;
+      const free = by.find((s) => !C.ROLES.some((r) => dt[r] === s.id));
+      dt[role] = free ? free.id : null;
+    });
   };
 
   /* ---------- Weekly work ---------- */
@@ -224,13 +259,18 @@
     const st = G.state, W = G.World;
     C.pay(cal.fee);
     let entries;
+    let carried = null;
     if (cal.type === 'qual') entries = U.shuffle(st.world.teams).slice(0, 23).map((t) => W.entry(t, st.week));
+    else if (cal.type === 'meet' || cal.type === 'league') {
+      entries = st.league.ids.map((id) => W.entry(st.world.teams.find((t) => t.id === id), st.week));
+      carried = st.league.stats;
+    }
     else if (cal.type === 'regional') {
       const sorted = st.world.teams.slice().sort((a, b) => (b.qr ? 1000 : 0) + b.rating - (a.qr ? 1000 : 0) - a.rating);
       entries = sorted.slice(0, 31).map((t) => W.entry(t, st.week));
     } else entries = W.elite(39).map((t) => W.entry(t, st.week));
     entries.push({ id: 'P', num: st.team.number, name: st.team.name, isPlayer: true });
-    st.event = G.Event.create(cal.type, cal.name, U.shuffle(entries));
+    st.event = G.Event.create(cal.type, cal.name, U.shuffle(entries), carried);
     st.event.calWeek = cal.week;
     C.news('Arrived at the ' + cal.name + '. Entry and travel: ' + U.money(cal.fee) + '.');
   }
@@ -260,24 +300,36 @@
   C.finishEvent = function () {
     const st = G.state, ev = st.event, s = ev.summary;
     const cal = st.calendar.find((c) => c.week === ev.calWeek);
-    const mult = { qual: 1, regional: 1.8, worlds: 3 }[ev.type];
+    if (ev.type === 'meet') {
+      st.league.stats = ev.stats;
+      C.rep(s.wins * 0.3);
+      st.morale = U.clamp(st.morale + (s.wins - s.losses) * 2, 5, 100);
+      cal.done = true; cal.summary = s;
+      C.news(ev.name + ': ' + s.record + ', now ranked ' + s.rank + ' of ' + s.of + ' in the league.');
+      st.event = null;
+      return;
+    }
+    const first = ev.type === 'qual' || ev.type === 'league';
+    const mult = { qual: 1, league: 1, regional: 1.8, worlds: 3 }[ev.type];
+    if (s.result === 'Winning Alliance') st.banners.push({ season: st.season, text: 'Winning Alliance', sub: ev.name });
+    s.awards.forEach((a) => { if (a === 'Inspire Award' || a === 'Compass Award') st.banners.push({ season: st.season, text: a, sub: ev.name }); });
     let rep = { 'Winning Alliance': 4, Finalist: 3, Semifinalist: 1.5 }[s.result] || 0;
     s.awards.forEach((a) => { rep += a === 'Inspire Award' ? 3 : 2; });
     if (s.rank <= s.of / 4) rep += 1;
     C.rep(rep * mult);
     st.morale = U.clamp(st.morale + (rep ? 4 + rep : -4), 5, 100);
-    if (s.seed > 0) st.flags[{ qual: 'playoffsQ', regional: 'playoffsR', worlds: 'playoffsW' }[ev.type]] = true;
+    if (s.seed > 0) st.flags[{ qual: 'playoffsQ', league: 'playoffsQ', regional: 'playoffsR', worlds: 'playoffsW' }[ev.type]] = true;
     if (ev.type === 'worlds' && s.result === 'Winning Alliance') st.flags.wonWorlds = true;
     if (s.advanced) {
-      const flag = ev.type === 'qual' ? 'qualRegional' : 'qualWorlds';
+      const flag = first ? 'qualRegional' : 'qualWorlds';
       if (!st.flags[flag]) {
         st.flags[flag] = true;
-        const gift = ev.type === 'qual' ? 500 : 2500;
+        const gift = first ? 500 : 2500;
         C.earn(gift);
-        C.news('Qualified for the ' + (ev.type === 'qual' ? 'Regional Championship' : 'World Championship') + '! Supporters chip in ' + U.money(gift) + '.');
+        C.news('Qualified for the ' + (first ? 'Regional Championship' : 'World Championship') + '! Supporters chip in ' + U.money(gift) + '.');
       }
     }
-    if (ev.type === 'qual') ev.advancing.forEach((id) => { const t = st.world.teams.find((x) => x.id === id); if (t) t.qr = true; });
+    if (first) ev.advancing.forEach((id) => { const t = st.world.teams.find((x) => x.id === id); if (t) t.qr = true; });
     cal.done = true; cal.summary = s;
     C.news(ev.name + ': ranked ' + s.rank + ' of ' + s.of + ' (' + s.record + '), ' + s.result + (s.awards.length ? ', ' + s.awards.join(' + ') : '') + '.');
     st.event = null;
@@ -312,7 +364,15 @@
     C.news(m.name + ' joins as a ' + D.MENTOR_AREAS[m.area] + ' mentor.');
     return true;
   };
-  C.dismiss = function (i) { G.state.mentors.splice(i, 1); };
+  C.dismiss = function (i) { const m = G.state.mentors.splice(i, 1)[0]; if (m && G.state.compass === m.name) G.state.compass = null; };
+  /** One mentor per season can be put forward for the Compass Award. */
+  C.nominate = function (i) { const m = G.state.mentors[i]; if (m) G.state.compass = m.name; };
+  C.buyPerk = function (id) {
+    const st = G.state, x = D.VENDOR.find((p) => p.id === id);
+    if (!x || st.perks[id] || !st.vendor.includes(id) || st.team.money < x.cost) return false;
+    C.pay(x.cost); st.perks[id] = true;
+    return true;
+  };
 
   /* ---------- Season review & rollover ---------- */
   C.makeReview = function () {
@@ -321,7 +381,8 @@
     st.review = { goal: goal.text, met, grant: met ? goal.grant : 0, rep: met ? 6 : -3,
       graduating: st.students.filter((s) => s.grade >= 12).map((s) => s.name),
       events: st.calendar.filter((c) => c.done).map((c) => ({ name: c.name, s: c.summary })),
-      income: st.ledger.income, spent: st.ledger.spent, champion: !!st.flags.wonWorlds };
+      income: st.ledger.income, spent: st.ledger.spent, champion: !!st.flags.wonWorlds,
+      grade: st.flags.wonWorlds ? 'S' : st.flags.qualWorlds ? 'A' : st.flags.qualRegional ? 'B' : st.flags.playoffsQ ? 'C' : 'D' };
     st.phase = 'review';
   };
 
@@ -346,13 +407,9 @@
     st.awards = { portfolio: 0, outreach: Math.round(st.awards.outreach * 0.3) };
     st.practice = Math.round(st.practice * 0.35);
     st.robot = freshRobot();
-    st.game = pickGame(st);
-    st.calendar = calendar();
     G.World.newSeason(st.world);
-    st.goal = goalIndex(st.team.rep);
-    st.offers = makeOffers(st);
-    st.mentorPool = makeMentors();
-    C.autoDriveTeam();
+    setupSeason(st);
+    C.news('Summer vendor launches are in: see Finance for this year\'s new products.');
     C.news('Season ' + st.season + ' begins. ' + recruits + ' new students join' + (r.graduating.length ? ', ' + r.graduating.length + ' graduated' : '') +
       '. ' + kept.length + ' sponsor' + (kept.length === 1 ? '' : 's') + ' renewed' + (lost ? ', ' + lost + ' left' : '') + '.');
   };

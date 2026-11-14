@@ -85,9 +85,9 @@
       if (r.plan.pace === 'push') p -= 0.05;
       r.carrying = false; r.state = 'idle';
       if (rng() < U.clamp(p, 0.25, 0.985)) {
-        add(m, r, auto ? 'auto' : 'tele', Math.round(goal.pts * (auto ? g.autoMult : 1)));
+        add(m, r, auto ? 'auto' : 'tele', auto ? M.autoPts(g, goal) : goal.pts);
         r.scored++;
-        if (++m.count[r.side] % g.set.size === 0) {
+        if (g.set && ++m.count[r.side] % g.set.size === 0) {
           add(m, r, auto ? 'auto' : 'tele', g.set.bonus);
           log(m, r.side, (r.side ? 'Blue' : 'Red') + ' completes a ' + g.set.name + ' (+' + g.set.bonus + ')');
         }
@@ -157,7 +157,14 @@
     if (!auto && !m.teleStarted) {
       m.teleStarted = true;
       m.robots.forEach((r) => {
-        if (r.moved && !r.dead) add(m, r, 'auto', g.autoLeave);
+        if (r.moved && !r.dead) {
+          add(m, r, 'auto', g.autoLeave);
+          const ab = g.autoBonus;
+          if (ab && r.perf.auto >= ab.req && m.rng() < 0.6 + 0.35 * (r.perf.auto - ab.req) / (100 - ab.req)) {
+            add(m, r, 'auto', ab.pts);
+            log(m, r.side, r.num + ': ' + ab.name + ' (+' + ab.pts + ')');
+          }
+        }
         if (r.state === 'wait') r.state = 'idle';
       });
       log(m, -1, 'Autonomous ends: Red ' + m.score[0].auto + ' - ' + m.score[1].auto + ' Blue');
@@ -174,6 +181,8 @@
     }
   };
 
+  /** Points for a goal during autonomous: explicit value, or the game's multiplier. */
+  M.autoPts = (g, goal) => (goal.auto != null ? goal.auto : Math.round(goal.pts * g.autoMult));
   M.total = (s) => s.auto + s.tele + s.end + s.pen;
   M.totals = (m) => [M.total(m.score[0]), M.total(m.score[1])];
   M.run = function (m) { while (!m.done) M.step(m); return M.result(m); };

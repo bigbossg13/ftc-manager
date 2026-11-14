@@ -2,7 +2,7 @@
 (function (G) {
   'use strict';
   const U = G.U, D = G.Data, C = G.Career, E = G.Event, M = G.Match, V = G.MatchView;
-  const UI = (G.UI = { tab: 'hq', need: null, live: null, liveDone: false, result: null, diff: 'normal' });
+  const UI = (G.UI = { tab: 'hq', need: null, live: null, liveDone: false, result: null, diff: 'normal', mode: 'career', format: 'qual', game: 'powerplay', name: 'Robo Rookies', num: 10000 + Math.floor(Math.random() * 20000) });
   const app = document.getElementById('app');
   const e = U.esc;
 
@@ -17,18 +17,26 @@
   const relCls = (v) => (v >= 75 ? 'g' : v >= 50 ? 'w' : 'r');
   const tname = (t) => '<b class="num">' + t.num + '</b> ' + e(t.name);
 
+  const gameOpt = (g) => '<option value="' + g.id + '"' + (UI.game === g.id ? ' selected' : '') + '>' + g.name + (g.year ? ' (' + C.yearLabel(g.year) + ')' : '') + '</option>';
+
   /* ---------- menu ---------- */
   function menu() {
     return '<div class="menu"><div class="logo">FTC <span>MANAGER</span></div>' +
       '<p class="muted">Run a robotics team from the garage to the World Championship. You don\'t drive the robot. You build the program behind it.</p>' +
       (G.hasSave() ? '<div class="card" style="margin:14px 0"><div class="row spread"><b>Saved career found</b>' + btn('Continue', 'continue', undefined, { cls: 'primary' }) + '</div></div>' : '') +
       '<div class="card"><h2>New career</h2>' +
-      '<div class="field"><label for="tn">Team name</label><input id="tn" type="text" maxlength="28" value="Robo Rookies"></div>' +
-      '<div class="field"><label for="tnum">Team number</label><input id="tnum" type="number" min="1" max="99999" value="' + (10000 + Math.floor(Math.random() * 20000)) + '"></div>' +
+      '<div class="field"><label for="tn">Team name</label><input id="tn" type="text" maxlength="28" value="' + e(UI.name) + '"></div>' +
+      '<div class="field"><label for="tnum">Team number</label><input id="tnum" type="number" min="1" max="99999" value="' + e(UI.num) + '"></div>' +
+      '<div class="field"><label>Mode</label>' + seg('mode', UI.mode, [['career', 'Career'], ['single', 'Single season']]) +
+      '<div class="muted" style="margin-top:6px">' + (UI.mode === 'career' ? D.CAREER_SEASONS + ' seasons: ' + D.REAL.map((g) => g.name).join(', ') + ', then five simulated games.'
+        : 'One season of the game you pick, graded S to D.') + '</div>' +
+      (UI.mode === 'single' ? '<select data-c="game" style="margin-top:8px"><optgroup label="FTC seasons">' + D.REAL.map(gameOpt).join('') + '</optgroup><optgroup label="Simulated games">' + D.SIM.map(gameOpt).join('') + '</optgroup></select>' : '') + '</div>' +
+      '<div class="field"><label>Region format</label>' + seg('format', UI.format, [['qual', 'Qualifiers'], ['league', 'League meets']]) +
+      '<div class="muted" style="margin-top:6px">' + (UI.format === 'league' ? 'Three league meets with carried-over standings, then a League Tournament.' : 'Two qualifying tournaments, each with playoffs and awards.') + '</div></div>' +
       '<div class="field"><label>Starting situation</label>' +
       Object.keys(D.DIFFICULTY).map((k) => { const d = D.DIFFICULTY[k]; return '<button class="opt ' + (UI.diff === k ? 'on' : '') + '" data-a="diff" data-v="' + k + '"><b>' + d.name + '</b> · ' + U.money(d.money) + '<div class="muted">' + d.desc + '</div></button>'; }).join('') +
       '</div>' + btn('Start career', 'new', undefined, { cls: 'primary big' }) + '</div>' +
-      '<p class="muted" style="margin-top:14px">An unofficial fan project. Not affiliated with or endorsed by <i>FIRST</i>. All season games in here are made up.</p></div>';
+      '<p class="muted" style="margin-top:14px">An unofficial fan project. Not affiliated with or endorsed by <i>FIRST</i>. Real season games are simplified for the simulation.</p></div>';
   }
 
   /* ---------- chrome ---------- */
@@ -39,7 +47,7 @@
     const adv = st.event ? btn('Go to event', 'tab', 'event', { cls: 'primary' })
       : st.phase === 'review' ? '' : btn('Advance week ▶', 'advance', undefined, { cls: 'primary' });
     return '<div class="top"><div class="top-in"><span class="badge">' + st.team.number + '</span><span class="teamname">' + e(st.team.name) + '</span>' +
-      '<div class="kpis"><span class="kpi">Season <b>' + st.season + '</b> · Week <b>' + st.week + '</b></span>' +
+      '<div class="kpis"><span class="kpi">' + (st.kickoff ? D.game(st.game).name + ' ' : '') + '<b>' + C.yearLabel(st.year) + '</b> · Week <b>' + st.week + '</b></span>' +
       '<span class="kpi">Budget <b class="' + (st.team.money < 0 ? 'bad' : '') + '">' + U.money(st.team.money) + '</b></span>' +
       '<span class="kpi">Reputation <b>' + Math.round(st.team.rep) + '</b></span><span class="kpi">Morale <b>' + Math.round(st.morale) + '</b></span>' + adv + '</div></div>' +
       '<nav>' + tabs.map((t) => '<button class="' + (UI.tab === t[0] ? 'on' : t[0] === 'event' ? 'alert' : '') + '" data-a="tab" data-v="' + t[0] + '">' + t[1] + '</button>').join('') + '</nav></div>';
@@ -47,12 +55,14 @@
 
   function gameInfo(g) {
     return '<p>' + g.tagline + '</p><div class="scroll"><table>' +
-      '<tr><th>Autonomous (0:30)</th><td>Leave the start: <b>+' + g.autoLeave + '</b>. Every ' + g.element + ' scored counts <b>×' + g.autoMult + '</b>.</td></tr>' +
-      '<tr><th>' + g.low.name + '</th><td><b>' + g.low.pts + '</b> per ' + g.element + '. Any robot can score here.</td></tr>' +
-      '<tr><th>' + g.high.name + '</th><td><b>' + g.high.pts + '</b> per ' + g.element + '. Needs Scoring ' + g.high.req + '+.</td></tr>' +
-      '<tr><th>Bonus</th><td>Every ' + g.set.size + ' ' + g.elements + ' your alliance scores completes a ' + g.set.name + ': <b>+' + g.set.bonus + '</b>.</td></tr>' +
+      '<tr><th>Autonomous (0:30)</th><td>Leave or park: <b>+' + g.autoLeave + '</b>.' + (g.autoBonus ? ' ' + g.autoBonus.name + ': <b>+' + g.autoBonus.pts + '</b> (Auto ' + g.autoBonus.req + '+).' : '') + '</td></tr>' +
+      '<tr><th>' + g.low.name + '</th><td><b>' + g.low.pts + '</b> per ' + g.element + ' (<b>' + M.autoPts(g, g.low) + '</b> in auto). Any robot can score here.</td></tr>' +
+      '<tr><th>' + g.high.name + '</th><td><b>' + g.high.pts + '</b> per ' + g.element + ' (<b>' + M.autoPts(g, g.high) + '</b> in auto). Needs Scoring ' + g.high.req + '+.</td></tr>' +
+      (g.set ? '<tr><th>Bonus</th><td>Every ' + g.set.size + ' ' + g.elements + ' your alliance scores: ' + g.set.name + ', <b>+' + g.set.bonus + '</b>.</td></tr>' : '') +
       g.end.map((x, i) => '<tr><th>' + (i ? '' : 'Endgame (last 0:30)') + '</th><td>' + x.name + ': <b>+' + x.pts + '</b>' + (x.req ? ' (Endgame ' + x.req + '+)' : '') + '</td></tr>').join('') +
-      '</table></div><p class="muted" style="margin-top:8px">Scouting notes: ' + g.keys.join('. ') + '.</p>';
+      '</table></div><p class="muted" style="margin-top:8px">Scouting notes: ' + g.keys.join('. ') + '.</p>' +
+      (g.provisional ? '<p class="warn" style="font-size:13px">Point values for this game are placeholders until the official scoring is entered.</p>'
+        : g.real ? '<p class="muted">A simplified model of the ' + C.yearLabel(g.year) + ' game.</p>' : '');
   }
 
   function perfCard() {
@@ -127,16 +137,16 @@
     const rows = st.students.slice().sort((a, b) => b.grade - a.grade).map((s) =>
       '<tr><td><b>' + e(s.name) + '</b></td><td>Grade ' + s.grade + (s.grade === 12 ? ' <span class="tag">senior</span>' : '') + '</td>' +
       ['mech', 'soft', 'drive', 'biz'].map((k) => '<td><span class="num">' + Math.round(s[k]) + '</span>' + bar(s[k]) + '</td>').join('') +
-      '<td class="right"><span class="seg">' + btn('Driver', 'role', 'driver:' + s.id, { cls: dt.driver === s.id ? 'on' : '' }) + btn('Operator', 'role', 'operator:' + s.id, { cls: dt.operator === s.id ? 'on' : '' }) + '</span></td></tr>').join('');
-    const mentors = st.mentors.map((m, i) => '<tr><td><b>' + e(m.name) + '</b><div class="muted">' + D.MENTOR_AREAS[m.area] + '</div></td><td>' + pips(m.skill, 5) + '</td><td class="muted">+' + m.skill * 6 + '%</td><td class="right">' + btn('Part ways', 'dismiss', i, { cls: 'small' }) + '</td></tr>').join('');
+      '<td class="right"><select data-c="role" data-v="' + s.id + '"><option value="">-</option>' + C.ROLES.map((r) => '<option value="' + r + '"' + (dt[r] === s.id ? ' selected' : '') + '>' + C.ROLE_NAMES[r] + '</option>').join('') + '</select></td></tr>').join('');
+    const mentors = st.mentors.map((m, i) => '<tr><td><b>' + e(m.name) + '</b><div class="muted">' + D.MENTOR_AREAS[m.area] + '</div></td><td>' + pips(m.skill, 5) + '</td><td class="muted">+' + m.skill * 6 + '%</td><td class="right">' + (st.compass === m.name ? '<span class="tag a">Compass nominee</span> ' : btn('Nominate for Compass', 'nominate', i, { cls: 'small' }) + ' ') + btn('Part ways', 'dismiss', i, { cls: 'small' }) + '</td></tr>').join('');
     const full = st.mentors.length >= C.mentorSlots();
     const pool = st.mentorPool.map((m, i) => {
       const why = full ? 'No free mentor slot' : st.team.rep < m.minRep ? 'Needs reputation ' + m.minRep : '';
       return '<tr><td><b>' + e(m.name) + '</b><div class="muted">' + D.MENTOR_AREAS[m.area] + '</div></td><td>' + pips(m.skill, 5) + '</td><td class="right">' + btn('Invite', 'invite', i, { off: !!why, cls: 'small' }) + (why ? '<div class="muted">' + why + '</div>' : '') + '</td></tr>';
     }).join('');
     return '<div class="grid"><div class="card c12"><h3>Students (' + st.students.length + ') · drive team rating ' + C.driverSkill() + '</h3><div class="scroll"><table><tr><th>Name</th><th>Year</th><th>Mechanical</th><th>Software</th><th>Driving</th><th>Business</th><th class="right">Drive team</th></tr>' + rows + '</table></div>' +
-      '<p class="muted" style="margin-top:8px">The six best students in a skill set the pace for that kind of work. Seniors graduate at the end of the season; outreach and reputation bring in recruits.</p></div>' +
-      '<div class="card c6"><h3>Mentors (' + st.mentors.length + ' / ' + C.mentorSlots() + ')</h3>' + (mentors ? '<table>' + mentors + '</table>' : '<p class="muted">No mentors yet. Volunteers speed up work in their area.</p>') + '</div>' +
+      '<p class="muted" style="margin-top:8px">The drive team is four students: driver, operator, drive coach and human player. The six best students in a skill set the pace for that kind of work. Seniors graduate at the end of the season; outreach and reputation bring in recruits.</p></div>' +
+      '<div class="card c6"><h3>Mentors (' + st.mentors.length + ' / ' + C.mentorSlots() + ')</h3>' + (mentors ? '<table>' + mentors + '</table>' : '<p class="muted">No mentors yet. Volunteers speed up work in their area.</p>') + '<p class="muted" style="margin-top:8px">Nominate one mentor for the Compass Award, judged at tournaments on their skill and your outreach record.</p></div>' +
       '<div class="card c6"><h3>Volunteers available</h3>' + (pool ? '<table>' + pool + '</table>' : '<p class="muted">Nobody else is available this season.</p>') + '</div></div>';
   }
 
@@ -151,6 +161,8 @@
       '<p class="muted" style="margin-top:8px">Sponsors pay once per season. Most renew if you keep your reputation up and meet your goal.</p></div>' +
       '<div class="card c8"><h3>Sponsor prospects</h3>' + (offers ? '<div class="scroll"><table><tr><th>Company</th><th>Offer</th><th>Chance</th><th></th></tr>' + offers + '</table></div>' : '<p class="muted">No prospects left this season.</p>') +
       '<p class="muted" style="margin-top:8px">One pitch per week' + (st.pitched ? ' (done for this week)' : '') + '. A failed pitch closes that door until next season. Reputation and business skills improve your odds.</p></div>' +
+      '<div class="card c12"><h3>New from vendors this summer</h3><div class="scroll"><table>' + st.vendor.map((id) => { const x = D.VENDOR.find((p) => p.id === id); return '<tr><td><b>' + x.name + '</b> <span class="muted">' + x.vendor + '</span><div class="muted">' + x.desc + '</div></td><td class="right">' +
+        (st.perks[id] ? '<span class="tag a">In use</span>' : btn(U.money(x.cost), 'perk', id, { off: st.team.money < x.cost, cls: 'small' })) + '</td></tr>'; }).join('') + '</table></div><p class="muted" style="margin-top:8px">Vendors launch new products each summer. They are good for this season only: next year\'s game needs next year\'s parts.</p></div>' +
       '<div class="card c12"><h3>Workshop & equipment</h3><div class="scroll"><table>' + fac + '</table></div></div></div>';
   }
 
@@ -166,9 +178,10 @@
     const grade = (r) => (r >= 78 ? 'A+' : r >= 66 ? 'A' : r >= 54 ? 'B' : r >= 42 ? 'C' : r >= 30 ? 'D' : 'E');
     const rivals = st.world.teams.slice().sort((a, b) => b.rating - a.rating).slice(0, 20).map((t) => '<tr><td>' + tname(t) + '</td><td>' + grade(t.rating) + '</td><td>' + (t.qr ? '<span class="tag a">Regional</span>' : '') + '</td></tr>').join('');
     const hist = st.history.slice().reverse().map((h) => '<tr><td>Season ' + h.season + '</td><td>' + D.game(h.game).name + '</td><td>' + h.events.map((x) => x.name.replace(' Championship', '') + ': ' + x.s.result).join(' · ') + (h.champion ? ' 🏆' : '') + '</td><td>' + (h.met ? '<span class="good">Goal met</span>' : '<span class="muted">Goal missed</span>') + '</td></tr>').join('');
-    return '<div class="grid"><div class="card c12"><h3>Season ' + st.season + ' calendar</h3><div class="timeline"><div class="' + (st.kickoff ? '' : 'next') + '"><div class="muted">Week ' + D.WEEKS.kickoff + '</div><b>Kickoff</b><div class="muted">' + (st.kickoff ? D.game(st.game).name : 'Game reveal') + '</div></div>' + cal + '</div></div>' +
+    return '<div class="grid"><div class="card c12"><h3>Season ' + st.season + ' (' + C.yearLabel(st.year) + ') calendar</h3><div class="timeline"><div class="' + (st.kickoff ? '' : 'next') + '"><div class="muted">Week ' + D.WEEKS.kickoff + '</div><b>Kickoff</b><div class="muted">' + (st.kickoff ? D.game(st.game).name : 'Game reveal') + '</div></div>' + cal + '</div></div>' +
       '<div class="card c7"><h3>The game</h3>' + (st.kickoff ? '<h2>' + D.game(st.game).name + '</h2>' + gameInfo(D.game(st.game)) : '<p class="muted">Revealed at kickoff.</p>') + '</div>' +
       '<div class="card c5"><h3>Top programs in your region</h3><div class="scroll"><table><tr><th>Team</th><th>Strength</th><th></th></tr>' + rivals + '</table></div></div>' +
+      '<div class="card c12"><h3>Banners</h3>' + (st.banners.length ? '<div class="banners">' + st.banners.map((b) => '<div class="banner"><b>' + b.text + '</b><span>' + b.sub + '</span><span>Season ' + b.season + '</span></div>').join('') + '</div>' : '<p class="muted">Win an event, the Inspire Award or the Compass Award to hang a banner here.</p>') + '</div>' +
       (hist ? '<div class="card c12"><h3>Team history</h3><div class="scroll"><table>' + hist + '</table></div></div>' : '') + '</div>';
   }
 
@@ -227,6 +240,8 @@
         need.options.map((id) => { const t = E.team(ev, id), s = ev.stats[id]; return '<tr><td class="num">' + (order.indexOf(id) + 1) + '</td><td>' + tname(t) + '</td><td class="num">' + s.w + '-' + s.l + '-' + s.t + '</td><td class="num">' + E.avg(ev, id).toFixed(1) + '</td><td class="right">' + btn('Pick', 'pick', id, { cls: 'small primary' }) + '</td></tr>'; }).join('') + '</table></div>';
     }
     const s = ev.summary;
+    if (ev.type === 'meet') return '<h2>' + ev.name + ' complete</h2><table><tr><td>Record at this meet</td><td class="right"><b>' + s.record + '</b></td></tr><tr><td>League standing</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + '</td></tr></table>' +
+      '<p class="muted" style="margin-top:10px">League meets have no playoffs or awards. Your standing carries into the League Tournament.</p><div class="row" style="margin-top:14px">' + btn('Pack up and head home ▶', 'leave', undefined, { cls: 'primary big' }) + '</div>';
     return '<h2>' + ev.name + ' complete</h2><table><tr><td>Qualification rank</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + ' (' + s.record + ')</td></tr><tr><td>Playoffs</td><td class="right"><b>' + s.result + '</b></td></tr>' +
       '<tr><td>Awards</td><td class="right">' + (s.awards.length ? '<b>' + s.awards.join(', ') + '</b>' : 'None') + '</td></tr>' +
       (ev.type !== 'worlds' ? '<tr><td>Advancement</td><td class="right">' + (s.advanced ? '<b class="good">Advanced!</b>' : 'Did not advance') + '</td></tr>' : '') + '</table>' +
@@ -253,11 +268,11 @@
   function help() {
     return '<div class="card help"><h2 style="margin-top:0">How to play</h2><p>You manage a robotics team across many seasons. Each turn is one week.</p>' +
       '<h2>The season</h2><ul><li><b>Preseason (weeks 1-2):</b> raise money, pitch sponsors, invite mentors, train students.</li><li><b>Kickoff (week ' + D.WEEKS.kickoff + '):</b> the game is revealed. Read the scoring: every game rewards different robots.</li>' +
-      '<li><b>Build and compete:</b> Qualifiers in weeks ' + D.WEEKS.q1 + ' and ' + D.WEEKS.q2 + '. Advance from either to the Regional Championship (week ' + D.WEEKS.regional + '), and from there to the World Championship (week ' + D.WEEKS.worlds + '). You keep improving the robot between events.</li></ul>' +
+      '<li><b>Build and compete:</b> Qualifiers in weeks ' + D.WEEKS.q1 + ' and ' + D.WEEKS.q2 + ' (or, in a league region, three meets and a League Tournament). Advance from either to the Regional Championship (week ' + D.WEEKS.regional + '), and from there to the World Championship (week ' + D.WEEKS.worlds + '). You keep improving the robot between events.</li></ul>' +
       '<h2>The workshop</h2><ul><li>Each week you have a number of <b>work blocks</b>. Assign them to subsystem projects and other jobs.</li><li>Pick a <b>design concept</b> per subsystem. Simple concepts are cheap and fast but top out early. Advanced ones cost more money and work.</li>' +
       '<li>Every upgrade costs <b>reliability</b>. Spend blocks on Test & Tune before an event or watch your robot die on the field.</li><li><b>Driver practice</b> makes cycles faster and penalties rarer.</li></ul>' +
       '<h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
-      '<li>Playoffs are best-of-three semifinals and a final.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. A great portfolio and outreach record can carry a team with an average robot.</li>' +
+      '<li>Playoffs are best-of-three semifinals and a final.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. Nominate a mentor on the Team screen for the Compass Award. A great portfolio and outreach record can carry a team with an average robot.</li>' +
       '<li>During a live match you can make <b>coach calls</b>: push for speed at the risk of breakdowns and penalties, play it safe, or send the robot to the endgame early.</li></ul>' +
       '<h2>The long game</h2><ul><li>Meeting your season goal brings a grant and reputation. Reputation unlocks better sponsors, mentors and recruits.</li><li>Seniors graduate. Train the younger students before you need them.</li></ul>' +
       '<h2>Save</h2><p>The game autosaves in this browser after every action.</p><div class="row">' + btn('Delete save and return to menu', 'wipe') + '</div></div>';
@@ -273,7 +288,9 @@
         '<p style="margin-top:12px"><b>Goal:</b> ' + r.goal + ' — ' + (r.met ? '<span class="good">met. Grant of ' + U.money(r.grant) + ', reputation +' + r.rep + '.</span>' : '<span class="bad">missed. Reputation ' + r.rep + '.</span>') + '</p>' +
         '<p>Income ' + U.money(r.income) + ' · Spent ' + U.money(r.spent) + '</p>' +
         '<p>' + (r.graduating.length ? 'Graduating: ' + r.graduating.map(e).join(', ') + '.' : 'Nobody graduates this year.') + '</p>' +
-        '<p class="muted">A new game means a new robot. Your students, equipment, mentors and design experience carry over.</p>' + btn('Start season ' + (st.season + 1) + ' ▶', 'nextSeason', undefined, { cls: 'primary big' }) + '</div></div>';
+        (st.mode === 'single' ? '<div class="gamename">Grade: ' + r.grade + '</div><p class="muted">Single season complete.</p>' + btn('Back to menu', 'endSingle', undefined, { cls: 'primary big' })
+          : (st.season === D.CAREER_SEASONS ? '<p class="good">That completes the ' + D.CAREER_SEASONS + '-season career. You can keep playing with randomly drawn games.</p>' : '') +
+            '<p class="muted">A new game means a new robot. Your students, equipment, mentors and design experience carry over.</p>' + btn('Start season ' + (st.season + 1) + ' ▶', 'nextSeason', undefined, { cls: 'primary big' })) + '</div></div>';
     }
     if (st.modal === 'kickoff') {
       const g = D.game(st.game);
@@ -301,10 +318,13 @@
   }
   const act = {
     diff(v) { UI.diff = v; },
+    mode(v) { UI.mode = v; },
+    format(v) { UI.format = v; },
+    nominate(v) { C.nominate(+v); },
+    perk(v) { C.buyPerk(v); },
+    endSingle() { G.wipe(); G.state = null; },
     new() {
-      const name = document.getElementById('tn').value.trim() || 'Robo Rookies';
-      const number = U.clamp(parseInt(document.getElementById('tnum').value, 10) || 12345, 1, 99999);
-      C.newGame({ name, number, difficulty: UI.diff });
+      C.newGame({ name: UI.name.trim() || 'Robo Rookies', number: U.clamp(parseInt(UI.num, 10) || 12345, 1, 99999), difficulty: UI.diff, mode: UI.mode, format: UI.format, game: UI.game });
       UI.tab = 'hq';
     },
     continue() { if (G.load()) UI.tab = G.state.event ? 'event' : 'hq'; },
@@ -320,11 +340,6 @@
     alloc(v) { const [id, d] = v.split(':'); C.setAlloc(id, +d); },
     overtime(v) { G.state.overtime = v === '1'; C.sanitizeAlloc(); },
     upgrade(v) { if (C.startUpgrade(v) && C.used() < C.blocks()) C.setAlloc(v, 1); },
-    role(v) {
-      const [role, id] = v.split(':'), dt = G.state.driveTeam, other = role === 'driver' ? 'operator' : 'driver';
-      if (dt[other] === id) dt[other] = dt[role];
-      dt[role] = id;
-    },
     invite(v) { C.invite(+v); },
     dismiss(v) { C.dismiss(+v); },
     pitch(v) { C.pitch(+v); },
@@ -356,11 +371,15 @@
     if (!el || el.disabled) return;
     const fn = act[el.dataset.a];
     if (!fn) return;
+    if (!G.state && document.getElementById('tn')) { UI.name = document.getElementById('tn').value; UI.num = document.getElementById('tnum').value; }
     if (fn(el.dataset.v) === false) return;
     G.save();
     UI.render();
   });
   document.addEventListener('change', (ev) => {
+    const any = ev.target.closest('[data-c]');
+    if (any && any.dataset.c === 'game') { UI.game = any.value; return; }
+    if (any && any.dataset.c === 'role') { C.setRole(any.dataset.v, any.value); G.save(); UI.render(); return; }
     const el = ev.target.closest('[data-c="concept"]');
     if (!el) return;
     const sub = G.state.robot.subs[el.dataset.v];

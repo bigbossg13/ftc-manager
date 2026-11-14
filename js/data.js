@@ -8,7 +8,72 @@
 
   /* ---- Season games (all fictional). Layout coordinates are for the red
      alliance on a unit field; blue is rotated 180 degrees. ---- */
-  D.GAMES = [
+
+  /* ---- Real FTC seasons, simplified to fit the match engine: one low and
+     one high scoring location, an optional repeating bonus, three endgame
+     tiers. Field positions are schematic, not to scale. ---- */
+  D.REAL = [
+    {
+      id: 'powerplay', real: true, year: 2022, name: 'POWERPLAY', element: 'cone', elements: 'cones', color: '#f2c230',
+      tagline: 'Stack cones on spring-loaded junctions and connect your terminals with a circuit.',
+      keys: ['High junctions need a tall, steady lift', 'Reading the signal sleeve in autonomous is worth 20', 'Owning junctions adds up over a match'],
+      scorer: ['Claw Arm', 'Linear Slides', 'Slides + Turret'],
+      low: { name: 'Low Junction', pts: 3, auto: 3 }, high: { name: 'High Junction', pts: 5, auto: 5, req: 36 },
+      autoMult: 1, autoLeave: 2, autoBonus: { name: 'Parks in the signal zone', pts: 20, req: 30 },
+      set: { size: 3, bonus: 3, name: 'junction (owned)' },
+      end: [{ name: 'Park in the terminal', pts: 2, req: 0 }, { name: 'Cap a junction with the beacon', pts: 10, req: 30 }, { name: 'Beacon cap + completed circuit', pts: 30, req: 58 }],
+      collectTime: 0.9, scoreTime: 1.15,
+      layout: { start: [[0.08, 0.3], [0.08, 0.7]], collect: [[0.07, 0.5], [0.45, 0.08], [0.45, 0.92]], low: [0.26, 0.6], high: [0.42, 0.42], end: [0.1, 0.9] },
+    },
+    {
+      id: 'centerstage', real: true, year: 2023, name: 'CENTERSTAGE', element: 'pixel', elements: 'pixels', color: '#e9e9ee',
+      tagline: 'Build mosaics on the backdrop, hang from the rigging and launch a drone.',
+      keys: ['Pixels are a full field away: speed matters', 'Team prop detection is worth 20 in autonomous', 'Suspend and drone together are worth 50'],
+      scorer: ['Drop Bucket', 'Linear Slides', 'Slides + Pixel Aligner'],
+      low: { name: 'Backstage', pts: 1, auto: 3 }, high: { name: 'Backdrop', pts: 3, auto: 5, req: 30 },
+      autoMult: 1, autoLeave: 5, autoBonus: { name: 'Team prop bonus pixels', pts: 20, req: 35 },
+      set: { size: 5, bonus: 10, name: 'mosaic or set line' },
+      end: [{ name: 'Park backstage', pts: 5, req: 0 }, { name: 'Suspend from the rigging', pts: 20, req: 35 }, { name: 'Suspend and land the drone', pts: 50, req: 62 }],
+      collectTime: 0.95, scoreTime: 1.05,
+      layout: { start: [[0.08, 0.35], [0.08, 0.65]], collect: [[0.9, 0.12], [0.9, 0.3], [0.5, 0.5]], low: [0.12, 0.25], high: [0.06, 0.15], end: [0.5, 0.86] },
+    },
+    {
+      id: 'intothedeep', real: true, year: 2024, name: 'INTO THE DEEP', element: 'sample', elements: 'samples', color: '#f0c33d',
+      tagline: 'Pull samples out of the submersible, fill the baskets and ascend.',
+      keys: ['Digging in the submersible is slow: invest in the intake', 'Autonomous scores count double', 'A level 3 ascent is worth 30'],
+      scorer: ['Claw Arm', 'Linear Slides', 'Slides + Pivot Arm'],
+      low: { name: 'Low Basket', pts: 4, auto: 8 }, high: { name: 'High Basket', pts: 8, auto: 16, req: 38 },
+      autoMult: 2, autoLeave: 3, set: null,
+      end: [{ name: 'Level 1 ascent', pts: 3, req: 0 }, { name: 'Level 2 ascent', pts: 15, req: 40 }, { name: 'Level 3 ascent', pts: 30, req: 68 }],
+      collectTime: 1.3, scoreTime: 1.05,
+      layout: { start: [[0.08, 0.35], [0.08, 0.65]], collect: [[0.4, 0.42], [0.4, 0.58], [0.2, 0.2]], low: [0.13, 0.16], high: [0.07, 0.08], end: [0.4, 0.74] },
+    },
+    {
+      id: 'decode', real: true, year: 2025, name: 'DECODE', element: 'artifact', elements: 'artifacts', color: '#a05cf0',
+      tagline: 'Launch artifacts into the goal, build the motif pattern and return to base.',
+      keys: ['Fast shooting cycles: intake and launcher both matter', 'Classified artifacts are worth three times overflow', 'Both robots in base at the end pays a bonus'],
+      scorer: ['Fixed Flywheel', 'Adjustable-Hood Shooter', 'Turreted Shooter'],
+      low: { name: 'Overflow', pts: 1, auto: 1 }, high: { name: 'Goal (classified)', pts: 3, auto: 3, req: 28 },
+      autoMult: 1, autoLeave: 3, autoBonus: { name: 'Motif pattern in autonomous', pts: 6, req: 40 },
+      set: { size: 3, bonus: 3, name: 'pattern match' },
+      end: [{ name: 'Partially in base', pts: 5, req: 0 }, { name: 'Fully in base', pts: 10, req: 25 }, { name: 'Full return with partner bonus', pts: 20, req: 55 }],
+      collectTime: 0.8, scoreTime: 0.75,
+      layout: { start: [[0.1, 0.2], [0.55, 0.92]], collect: [[0.45, 0.3], [0.45, 0.6], [0.9, 0.9]], low: [0.16, 0.2], high: [0.08, 0.08], end: [0.3, 0.75] },
+    },
+    {
+      id: 'biobuzz', real: true, year: 2026, provisional: true, name: 'BIOBUZZ', element: 'pollen', elements: 'pollen', color: '#f5c518',
+      tagline: 'Launch pollen and nectar into your hive until it tips, then claim the flowers.',
+      keys: ['Enough pollen in the cell tips the hive for a bonus', 'Flowers are contested late in the match', 'Owning a flower means your nectar is on top'],
+      scorer: ['Push Launcher', 'Flywheel Launcher', 'Turreted Launcher'],
+      low: { name: 'Flower', pts: 2, auto: 4 }, high: { name: 'Hive Cell', pts: 3, auto: 6, req: 30 },
+      autoMult: 2, autoLeave: 3, set: { size: 4, bonus: 8, name: 'hive tip' },
+      end: [{ name: 'Nectar in a flower', pts: 5, req: 0 }, { name: 'Own a flower', pts: 12, req: 35 }, { name: 'Own several flowers', pts: 25, req: 62 }],
+      collectTime: 0.85, scoreTime: 0.85,
+      layout: { start: [[0.08, 0.3], [0.08, 0.7]], collect: [[0.5, 0.2], [0.5, 0.8], [0.35, 0.5]], low: [0.3, 0.3], high: [0.1, 0.5], end: [0.6, 0.5] },
+    },
+  ];
+
+  D.SIM = [
     {
       id: 'summit', name: 'SUMMIT STACK', element: 'crate', elements: 'crates', color: '#e8a33d',
       tagline: 'Haul supply crates up the mountain and race to the summit.',
@@ -65,6 +130,7 @@
       layout: { start: [[0.08, 0.3], [0.08, 0.7]], collect: [[0.56, 0.14], [0.56, 0.86], [0.08, 0.92]], low: [0.3, 0.6], high: [0.3, 0.4], end: [0.44, 0.5] },
     },
   ];
+  D.GAMES = D.REAL.concat(D.SIM);
   D.game = (id) => D.GAMES.find((g) => g.id === id);
 
   /* ---- Robot subsystems and the design concepts available for each ---- */
@@ -119,6 +185,20 @@
     { id: 'space', name: 'Bigger Workshop', cost: 2200, desc: '+1 work block per week, +1 mentor slot' },
   ];
 
+  /* ---- Vendor products. A few launch each summer and last one season. ---- */
+  const v = (id, vendor, name, cost, sub, kind, value, desc) => ({ id, vendor, name, cost, sub, kind, value, desc });
+  D.VENDOR = [
+    v('chassis', 'Pinion Labs', 'Pre-cut Chassis Kit', 350, 'drive', 'work', 0.3, 'Drivetrain upgrades take 30% less work'),
+    v('modules', 'Gridline Robotics', 'Low-friction Wheel Modules', 400, 'drive', 'stat', 5, '+5 Speed once the drivetrain is built'),
+    v('servo', 'TorqueWorks', 'High-torque Servo Line', 220, 'intake', 'stat', 5, '+5 Pickup once the intake is built'),
+    v('slides', 'Gridline Robotics', 'Belt-driven Slide Kit', 300, 'scorer', 'work', 0.25, 'Scoring mechanism upgrades take 25% less work'),
+    v('bulk', 'TorqueWorks', 'Bulk Hardware Bundle', 150, 'scorer', 'cost', 0.3, 'Scoring mechanism upgrades cost 30% less'),
+    v('winch', 'Volt & Bolt', 'Compact Winch Gearbox', 240, 'endgame', 'stat', 6, '+6 Endgame once the mechanism is built'),
+    v('optical', 'Pinion Labs', 'Optical Odometry Sensor', 280, 'software', 'stat', 6, '+6 Auto once software is started'),
+    v('camera', 'Volt & Bolt', 'Smart Camera v2', 200, 'software', 'work', 0.25, 'Software upgrades take 25% less work'),
+  ];
+
+  D.CAREER_SEASONS = 10;
   D.DIFFICULTY = {
     easy: { name: 'Well-Funded Rookie', money: 4500, rep: 22, desc: 'A supportive school and a starter grant.' },
     normal: { name: 'Garage Team', money: 2800, rep: 15, desc: 'A kit of parts, a folding table and big plans.' },
@@ -126,7 +206,7 @@
   };
 
   D.GOALS = [
-    { id: 'playoffsQ', text: 'Be part of a playoff alliance at a Qualifier', grant: 800 },
+    { id: 'playoffsQ', text: 'Be part of a playoff alliance at a Qualifier or League Tournament', grant: 800 },
     { id: 'qualRegional', text: 'Qualify for the Regional Championship', grant: 1500 },
     { id: 'qualWorlds', text: 'Qualify for the World Championship', grant: 3000 },
     { id: 'playoffsW', text: 'Reach the playoffs at the World Championship', grant: 5000 },

@@ -1,8 +1,8 @@
 /* FTC Manager — core: namespace, RNG, helpers, save system */
 (function (root) {
   'use strict';
-  const G = (root.FTC = { VERSION: '0.1.0' });
-  const SAVE_KEY = 'ftc-manager-save-v1';
+  const G = (root.FTC = { VERSION: '0.2.0' });
+  const SAVE_KEY = 'ftc-manager-save-v2';
 
   /** Small seeded PRNG (mulberry32). Returns a function producing floats in [0,1). */
   G.Rng = function (seed) {
@@ -57,7 +57,7 @@
       const raw = s.getItem(SAVE_KEY);
       if (!raw) return false;
       const st = JSON.parse(raw);
-      if (!st || st.v !== 1) return false;
+      if (!st || st.v !== 2) return false;
       G.state = st;
       return true;
     } catch (e) { return false; }
