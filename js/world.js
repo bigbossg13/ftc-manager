@@ -43,7 +43,7 @@
   };
 
   /** How far along rival robots are at a given week of the season (0..1). */
-  W.progress = (week) => U.clamp(0.45 + 0.025 * week, 0.45, 1);
+  W.progress = (week) => U.clamp(0.5 + 0.025 * week, 0.5, 1);
 
   /** Performance snapshot of a rival at a given point in the season. */
   W.perf = function (team, progress) {

@@ -15,6 +15,10 @@ The game autosaves to the browser's local storage.
 - **Five-season career** through POWERPLAY, CENTERSTAGE, INTO THE DEEP, DECODE and BIOBUZZ. Or play any one game, including five simulated ones, as a **single season** graded S to D. Students graduate, recruits arrive, sponsors renew or leave, rival programs rise and fall.
 - **A new game every season**, revealed at kickoff, each with different scoring, field layouts and endgames, so the best robot changes from year to year.
 - **Two region formats.** Qualifiers, or league play: three league meets with carried-over standings, then a League Tournament.
+- **A year in two speeds.** The offseason (May to August) is played a month at a time; from kickoff in September you plan week by week.
+- **Parts inventory and shop.** Upgrades are built from parts. Parts are cheaper in the offseason, leftovers carry over and half of last year's robot is salvaged.
+- **Inbox.** Decisions land on your desk (sponsor requests, breakdowns, student issues) and must be answered before the calendar moves on.
+- **Mentors cost money.** Each mentor has per-season expenses, billed when they join and every offseason.
 - **Robot design.** Five subsystems (drivetrain, intake, scoring mechanism, endgame, software), each with three design concepts that trade cost and build time against their ceiling. Experience with a concept carries into later seasons.
 - **Weekly planning.** Split the team's weekly hours, shown as one stacked bar, between building, testing, driver practice, the engineering portfolio, outreach, fundraising and training.
 - **Events.** Qualifiers, a Regional Championship and a World Championship with qualification matches, rankings, alliance selection, best-of-three playoffs, judged awards (Inspire, Think, Connect, Design, and the Compass Award for a mentor you nominate) and advancement. Wins and top awards hang orange banners on the Season screen.

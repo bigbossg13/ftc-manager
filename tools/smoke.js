@@ -11,6 +11,7 @@ const bump = (k) => { tally[k] = (tally[k] || 0) + 1; };
 
 function botWeek() {
   const st = G.state;
+  st.inbox.filter((m) => !m.done).forEach((m) => { const opts = C.msgOptions(m); let i = Math.floor(G.rand() * opts.length); if (!C.canChoose(opts[i])) i = opts.findIndex((o) => C.canChoose(o)); C.decide(m.id, i); bump('inbox: ' + m.t); });
   if (!st.pitched && st.offers.length) C.pitch(0);
   D.FACILITIES.forEach((f) => { if (st.team.money > f.cost + 1500) C.buy(f.id); });
   st.mentorPool.slice().forEach((m) => C.invite(st.mentorPool.indexOf(m)));
@@ -55,11 +56,12 @@ for (let c = 0; c < careers; c++) {
       if (C.advanceWeek() === 'event') playEvent();
     }
     const st = G.state, p = C.playerPerf();
-    console.log(`career ${c} season ${st.season} ${st.game.padEnd(11)} wk${st.week} rep ${st.team.rep.toFixed(0).padStart(3)} $${Math.round(st.team.money)} perf ${Object.values(p).join('/')} goal ${st.review.met ? 'MET' : 'missed'} :: ` +
+    console.log(`career ${c} season ${st.season} ${st.game.padEnd(11)} wk${String(st.week).padStart(2)} rep ${st.team.rep.toFixed(0).padStart(3)} $${Math.round(st.team.money)} perf ${Object.values(p).join('/')} goal ${st.review.met ? 'MET' : 'missed'} :: ` +
       st.review.events.map((e) => `${e.s.rank}/${e.s.of} ${e.s.record} ${e.s.result}`).join(' | '));
     C.nextSeason();
   }
 }
 scores.sort((a, b) => a - b);
 console.log('alliance scores p10/p50/p90/max:', [0.1, 0.5, 0.9].map((q) => scores[Math.floor(scores.length * q)]).join(' / '), '/', scores[scores.length - 1]);
-console.log(Object.keys(tally).sort().map((k) => k + ' = ' + tally[k]).join('\n'));
+console.log(Object.keys(tally).filter((k) => !k.startsWith('inbox')).sort().map((k) => k + ' = ' + tally[k]).join('\n'));
+console.log('inbox decisions:', Object.keys(tally).filter((k) => k.startsWith('inbox')).map((k) => k.slice(7) + ' ' + tally[k]).join(', '));

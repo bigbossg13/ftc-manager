@@ -3,7 +3,10 @@
   'use strict';
   const D = (G.Data = {});
 
-  D.WEEKS = { kickoff: 3, q1: 10, q2: 14, regional: 18, worlds: 22 };
+  /* The year: monthly turns through the offseason, then weekly turns from kickoff. */
+  D.MONTHS = ['May', 'June', 'July', 'August'];
+  D.VENDOR_MONTH = 2; // vendors launch new products in July
+  D.WEEKS = { q1: 8, q2: 12, regional: 16, worlds: 20, meets: [6, 8, 10], league: 12 };
   D.MATCH = { auto: 30, total: 150, endgame: 120, penalty: 10 };
 
   /* ---- Season games (all fictional). Layout coordinates are for the red
@@ -266,16 +269,80 @@
     v('modules', 'Gridline Robotics', 'Low-friction Wheel Modules', 400, 'drive', 'stat', 5, '+5 Speed once the drivetrain is built'),
     v('servo', 'TorqueWorks', 'High-torque Servo Line', 220, 'intake', 'stat', 5, '+5 Pickup once the intake is built'),
     v('slides', 'Gridline Robotics', 'Belt-driven Slide Kit', 300, 'scorer', 'work', 0.25, 'Scoring mechanism upgrades take 25% less work'),
-    v('bulk', 'TorqueWorks', 'Bulk Hardware Bundle', 150, 'scorer', 'cost', 0.3, 'Scoring mechanism upgrades cost 30% less'),
+    v('bulk', 'TorqueWorks', 'Team Discount Program', 150, null, 'discount', 0.15, 'All parts cost 15% less this season'),
     v('winch', 'Volt & Bolt', 'Compact Winch Gearbox', 240, 'endgame', 'stat', 6, '+6 Endgame once the mechanism is built'),
     v('optical', 'Pinion Labs', 'Optical Odometry Sensor', 280, 'software', 'stat', 6, '+6 Auto once software is started'),
     v('camera', 'Volt & Bolt', 'Smart Camera v2', 200, 'software', 'work', 0.25, 'Software upgrades take 25% less work'),
   ];
 
   D.CAREER_SEASONS = 5;
+
+  /* ---- Parts. Upgrades are built from these; leftovers and half of last
+     year's robot carry into the next season. ---- */
+  D.PARTS = [
+    { id: 'motor', name: 'DC Motor', price: 30 },
+    { id: 'servo', name: 'Servo', price: 20 },
+    { id: 'structure', name: 'Structure Kit', price: 10, desc: 'Channel, plates and brackets' },
+    { id: 'wheels', name: 'Wheel Set', price: 35 },
+    { id: 'sensor', name: 'Sensor', price: 30 },
+    { id: 'hardware', name: 'Hardware Pack', price: 5, desc: 'Screws, bearings, belts and wire' },
+  ];
+  D.part = (id) => D.PARTS.find((p) => p.id === id);
+  D.IN_SEASON_MARKUP = 0.25; // rush shipping once the season is on
+  D.SALVAGE = 0.5;
+  D.STARTER_PARTS = { motor: 2, servo: 2, structure: 6, wheels: 1, sensor: 0, hardware: 10 };
+  /* Parts for one level of each concept. Levels 4-6 need double, 7-9 triple, 10 four times. */
+  D.RECIPES = {
+    drive: { tank: { motor: 1, wheels: 1, structure: 1 }, mecanum: { motor: 2, wheels: 1, structure: 2, hardware: 2 }, swerve: { motor: 2, servo: 2, wheels: 2, structure: 3, sensor: 1, hardware: 4 } },
+    intake: { claw: { servo: 1, structure: 1, hardware: 1 }, roller: { motor: 1, servo: 1, structure: 2, hardware: 2 }, active: { motor: 2, servo: 2, structure: 3, sensor: 1 } },
+    scorer: { s1: { motor: 1, servo: 1, structure: 1 }, s2: { motor: 2, servo: 1, structure: 3, hardware: 2 }, s3: { motor: 3, servo: 2, structure: 4, sensor: 1, hardware: 4 } },
+    endgame: { hooks: { servo: 1, structure: 3 }, winch: { motor: 2, structure: 3, hardware: 3 }, fast: { motor: 2, servo: 2, structure: 5, sensor: 1, hardware: 4 } },
+    software: { timed: { hardware: 2 }, odo: { sensor: 2, hardware: 2 }, vision: { sensor: 5, hardware: 3 } },
+  };
+
+  /* ---- Inbox: decisions that land on the manager's desk. fx keys: money, rep,
+     morale, hours (this turn), rel, practice, portfolio, outreach, train (skill
+     gains), parts, loseMentor. risk: { p, win: { fx, text }, lose: { fx, text } }. ---- */
+  const o = (label, fx, risk) => ({ label, fx: fx || {}, risk });
+  D.INBOX = [
+    { id: 'demo', when: 'any', need: 'sponsor', from: '{sponsor}', title: 'Demo day invitation', body: '{sponsor} would like the team to show a robot at their office open day.',
+      options: [o('Send the whole team', { hours: -12, money: 400, rep: 2 }), o('Send two students', { hours: -4, money: 150 }), o('Decline politely', { rep: -1 })] },
+    { id: 'assembly', when: 'any', from: 'School principal', title: 'School assembly', body: 'The principal asks for a robot demonstration at the next school assembly.',
+      options: [o('Put on a show', { hours: -8, outreach: 6, rep: 1 }), o('Send a short video', { hours: -2, outreach: 2 }), o('Not this time')] },
+    { id: 'motor', when: 'season', need: 'robot', from: 'Build lead', title: 'Burned-out motor', body: 'A drive motor burned out during testing.',
+      options: [o('Order a replacement', { money: -45 }), o('Rebuild it in-house', { hours: -6, rel: -2 }), o('Run it as it is', { rel: -9 })] },
+    { id: 'dispute', when: 'season', from: 'Team captain', title: 'Design disagreement', body: 'Two sub-teams cannot agree on the design direction and work has stalled.',
+      options: [o('Hold a mentor-led design review', { hours: -5, morale: 6 }), o('Prototype both ideas', { hours: -10, morale: 3, train: 3 }), o('Make the call yourself', { morale: -5 })] },
+    { id: 'scrimmage', when: 'season', need: 'robot', from: 'A neighbouring team', title: 'Scrimmage invitation', body: 'A nearby team is hosting a scrimmage this weekend and has a spot for you.',
+      options: [o('Go', { money: -40, hours: -8, practice: 8, rel: 3 }), o('Stay and build')] },
+    { id: 'exams', when: 'season', from: 'Students', title: 'Exam week', body: 'It is exam week and the students are stretched thin.',
+      options: [o('Lighten the schedule', { hours: -15, morale: 8 }), o('Keep the schedule', { morale: -8 })] },
+    { id: 'grant', when: 'any', from: 'Community foundation', title: 'Grant deadline', body: 'A STEM grant is open, but the application is due right away.',
+      options: [o('Write the application', { hours: -10 }, { p: 0.55, win: { fx: { money: 1000 }, text: 'The grant came through: $1,000.' }, lose: { fx: {}, text: 'The application was not selected.' } }), o('Skip it')] },
+    { id: 'parent', when: 'any', from: 'A team parent', title: 'Offer of support', body: 'A parent wants to support the team and asks what would help most.',
+      options: [o('A donation', { money: 300 }), o('Parts for the robot', { parts: { motor: 2, servo: 2, structure: 4 } }), o('Snacks for build meetings', { morale: 8 })] },
+    { id: 'library', when: 'any', from: 'Public library', title: 'STEM night', body: 'The library would like the team to run a STEM night for local kids.',
+      options: [o('Run the full event', { hours: -8, outreach: 8, rep: 1.5 }), o('Send flyers and a display', { hours: -2, outreach: 3 }), o('Decline')] },
+    { id: 'clearance', when: 'pre', from: 'Parts vendor', title: 'Clearance bundle', body: 'End-of-season clearance: a mixed bundle of parts for $150, well under list price.',
+      options: [o('Buy the bundle', { money: -150, parts: { motor: 4, servo: 1, structure: 6, hardware: 8 } }), o('Pass')] },
+    { id: 'rookie', when: 'season', from: 'A rookie team', title: 'A team needs help', body: 'A rookie team is struggling with their drivetrain and asks if you can help.',
+      options: [o('Send students to help', { hours: -6, rep: 2, outreach: 4 }), o('Share your code and CAD', { hours: -2, rep: 1, outreach: 2 }), o('Too busy right now')] },
+    { id: 'allnighter', when: 'season', from: 'Students', title: 'All-nighter request', body: 'The build team wants to pull an all-nighter to get ahead.',
+      options: [o('Allow it', { hours: 12, morale: -6 }), o('Send everyone home', { morale: 2 })] },
+    { id: 'press', when: 'any', from: 'Local newspaper', title: 'Interview request', body: 'A reporter wants to write a feature on the team.',
+      options: [o('Do the interview', { hours: -3, rep: 2 }), o('Decline')] },
+    { id: 'tool', when: 'any', from: 'Workshop', title: 'Broken band saw', body: 'The band saw has stopped working.',
+      options: [o('Pay for the repair', { money: -120 }), o('Work around it', { hours: -8 })] },
+    { id: 'reimburse', when: 'any', need: 'mentor', from: '{mentor}', title: 'Travel costs', body: '{mentor} has been covering travel out of pocket and asks about reimbursement.',
+      options: [o('Reimburse them', { money: -150, morale: 3 }), o('Explain that the budget is tight', {}, { p: 0.7, win: { fx: {}, text: '{mentor} understands.' }, lose: { fx: { loseMentor: true }, text: '{mentor} steps back from the team.' } })] },
+    { id: 'judge', when: 'season', from: 'A veteran judge', title: 'Portfolio review', body: 'A veteran judge offers to look over your engineering portfolio.',
+      options: [o('Take the review', { hours: -4, portfolio: 7 }), o('No time')] },
+    { id: 'shirts', when: 'pre', from: 'Students', title: 'Team shirts', body: 'The students want to order team shirts and pins for the season.',
+      options: [o('Order them', { money: -200, morale: 6, rep: 1 }), o('Reuse last year\'s', { morale: -2 })] },
+  ];
   /* Starting situations. skill is added to every starting student's skills. */
   D.DIFFICULTY = {
-    dynasty: { name: 'Powerhouse Dynasty', money: 10000, rep: 62, skill: 28, roster: 12, facilities: ['printer', 'field'], desc: 'A decorated program with veterans, a practice field and sponsors who expect Worlds.' },
+    dynasty: { name: 'Powerhouse Dynasty', money: 10000, rep: 62, skill: 28, roster: 12, parts: 4, facilities: ['printer', 'field'], desc: 'A decorated program with veterans, a practice field and sponsors who expect Worlds.' },
     easy: { name: 'Well-Funded Rookie', money: 5000, rep: 22, skill: 0, roster: 8, desc: 'A supportive school and a starter grant.' },
     normal: { name: 'Garage Team', money: 3000, rep: 15, skill: 0, roster: 8, desc: 'A kit of parts, a folding table and big plans.' },
     hard: { name: 'Shoestring', money: 1500, rep: 8, skill: 0, roster: 8, desc: 'Borrowed tools and no sponsors. Good luck.' },

@@ -15,15 +15,15 @@
   function freshRobot() {
     const subs = {};
     D.SUBS.forEach((s) => { subs[s.id] = { concept: s.concepts[1].id, level: 0, progress: 0, active: false }; });
-    return { subs, rel: 70 };
+    return { subs, rel: 70, used: {} };
   }
   function calendar(format) {
     const w = D.WEEKS;
     const first = format === 'league' ? [
-      { week: 8, type: 'meet', name: 'League Meet 1', fee: 40 },
-      { week: 10, type: 'meet', name: 'League Meet 2', fee: 40 },
-      { week: 12, type: 'meet', name: 'League Meet 3', fee: 40 },
-      { week: 14, type: 'league', name: 'League Tournament', fee: 150 },
+      { week: w.meets[0], type: 'meet', name: 'League Meet 1', fee: 40 },
+      { week: w.meets[1], type: 'meet', name: 'League Meet 2', fee: 40 },
+      { week: w.meets[2], type: 'meet', name: 'League Meet 3', fee: 40 },
+      { week: w.league, type: 'league', name: 'League Tournament', fee: 150 },
     ] : [
       { week: w.q1, type: 'qual', name: 'Autumn Qualifier', fee: 150 },
       { week: w.q2, type: 'qual', name: 'Winter Qualifier', fee: 150 },
@@ -43,7 +43,7 @@
   function makeMentors() {
     return Object.keys(D.MENTOR_AREAS).map((area) => {
       const skill = U.rint(1, 5);
-      return { name: personName(), area, skill, minRep: Math.max(0, skill * 13 - 14 + U.rint(-4, 4)) };
+      return { name: personName(), area, skill, minRep: Math.max(0, skill * 13 - 14 + U.rint(-4, 4)), cost: 100 + skill * 110 + U.rint(-3, 3) * 10 };
     });
   }
   function pickGame(st) {
@@ -60,22 +60,21 @@
     st.vendor = U.shuffle(D.VENDOR).slice(0, 3).map((x) => x.id);
     st.perks = {};
     st.league = st.format === 'league' ? { ids: U.shuffle(st.world.teams).slice(0, 15).map((t) => t.id), stats: null } : null;
+    st.period = 'pre'; st.month = 0; st.week = 0; st.hoursMod = 0;
     C.autoDriveTeam();
+    const goal = D.GOALS[st.goal];
+    C.mail('School board', 'Season goal', 'This year the board expects the team to: ' + goal.text.charAt(0).toLowerCase() + goal.text.slice(1) + '. Meeting it earns a ' + U.money(goal.grant) + ' grant.');
   }
+  C.inPre = () => G.state.period === 'pre';
+  C.dateLabel = () => (C.inPre() ? D.MONTHS[G.state.month] : 'Week ' + G.state.week);
+  C.turn = () => (C.inPre() ? 'month' : 'week');
   C.yearLabel = (y) => y + '-' + String((y + 1) % 100).padStart(2, '0');
   const perk = (subId, kind) => D.VENDOR.reduce((a, x) => a + (G.state.perks[x.id] && x.sub === subId && x.kind === kind ? x.value : 0), 0);
   const goalIndex = (rep) => (rep < 28 ? 0 : rep < 50 ? 1 : rep < 72 ? 2 : 3);
 
-  /** Older saves counted work in blocks and points; convert them to hours. */
-  C.migrate = function (st) {
-    if (st.v >= 3) return;
-    Object.keys(st.alloc).forEach((id) => { st.alloc[id] *= 6; });
-    Object.values(st.robot.subs).forEach((s) => { s.progress = s.progress / 2.667; });
-    st.v = 3;
-  };
   C.news = function (text) {
     const st = G.state;
-    st.news.unshift({ s: st.season, w: st.week, text });
+    st.news.unshift({ s: st.season, d: C.dateLabel(), text });
     if (st.news.length > 40) st.news.length = 40;
   };
   C.pay = function (amount) { G.state.team.money -= amount; G.state.ledger.spent += amount; };
@@ -85,11 +84,12 @@
   C.newGame = function (opts) {
     const diff = D.DIFFICULTY[opts.difficulty] || D.DIFFICULTY.normal;
     const st = (G.state = {
-      v: 3, seed: (opts.seed || Date.now()) >>> 0, difficulty: opts.difficulty,
+      v: 4, seed: (opts.seed || Date.now()) >>> 0, difficulty: opts.difficulty,
       mode: opts.mode === 'single' ? 'single' : 'career', format: opts.format === 'league' ? 'league' : 'qual', order: [],
       banners: [], compass: null, vendor: [], perks: {}, league: null,
       team: { name: opts.name || 'Robo Rookies', number: opts.number || 31415, rep: diff.rep, money: diff.money },
-      season: 1, year: 2022, week: 1, phase: 'play', game: null, kickoff: false,
+      season: 1, year: 2022, week: 0, month: 0, period: 'pre', hoursMod: 0, phase: 'play', game: null, kickoff: false,
+      inventory: {}, inbox: [], recent: [],
       students: [], mentors: [], mentorPool: [], facilities: {}, sponsors: [], offers: [],
       robot: freshRobot(), knowledge: {}, practice: 0, morale: 75, overtime: false, alloc: {},
       awards: { portfolio: 0, outreach: 0 }, driveTeam: {}, plan: { auto: 'std', focus: 'high', end: 'normal' },
@@ -98,6 +98,7 @@
     });
     [9, 9, 10, 10, 10, 11, 11, 12, 9, 10, 11, 12].slice(0, diff.roster).forEach((g) => st.students.push(student(g, 14 + (g - 9) * 5 + diff.skill, 34 + (g - 9) * 7 + diff.skill)));
     (diff.facilities || []).forEach((f) => { st.facilities[f] = true; });
+    D.PARTS.forEach((p) => { st.inventory[p.id] = (D.STARTER_PARTS[p.id] || 0) * (diff.parts || 1); });
     st.world = G.World.create(st.team.number);
     if (st.mode === 'single') {
       const g = D.game(opts.game) || D.GAMES[0];
@@ -105,8 +106,7 @@
       st.year = g.year || 2026;
     } else st.order = D.REAL.map((g) => g.id);
     setupSeason(st);
-    C.news('Summer vendor launches are in: see Finance for this year\'s new products.');
-    C.news('Team ' + st.team.number + ' ' + st.team.name + ' is founded. Kickoff is in week ' + D.WEEKS.kickoff + '.');
+    C.news('Team ' + st.team.number + ' ' + st.team.name + ' is founded. Kickoff is in September.');
     return st;
   };
 
@@ -122,7 +122,31 @@
     const s = G.state.robot.subs[subId], c = C.concept(subId);
     return s.level === 0 ? 12 : Math.min(100, c.base + c.per * s.level + perk(subId, 'stat'));
   };
-  C.levelCost = function (subId) { const s = G.state.robot.subs[subId]; return Math.round(C.concept(subId).cost * (1 + 0.35 * s.level) * (1 - perk(subId, 'cost'))); };
+  /* ---------- Parts ---------- */
+  /** Parts the next level of a subsystem needs. */
+  C.recipe = function (subId) {
+    const s = G.state.robot.subs[subId], base = D.RECIPES[subId][s.concept], mult = 1 + Math.floor(s.level / 3), out = {};
+    Object.keys(base).forEach((id) => { out[id] = base[id] * mult; });
+    return out;
+  };
+  /** Shop price: list price in the offseason, a rush-shipping markup once the season starts. */
+  C.partPrice = function (id) {
+    const discount = D.VENDOR.reduce((a, x) => a + (G.state.perks[x.id] && x.kind === 'discount' ? x.value : 0), 0);
+    return Math.round(D.part(id).price * (C.inPre() ? 1 : 1 + D.IN_SEASON_MARKUP) * (1 - discount));
+  };
+  C.missing = function (subId) {
+    const need = C.recipe(subId), inv = G.state.inventory, out = {};
+    Object.keys(need).forEach((id) => { const short = need[id] - (inv[id] || 0); if (short > 0) out[id] = short; });
+    return out;
+  };
+  /** Cash needed to start the next level: only the parts not already in inventory. */
+  C.levelCost = function (subId) { const m = C.missing(subId); return Object.keys(m).reduce((a, id) => a + m[id] * C.partPrice(id), 0); };
+  C.buyPart = function (id, qty) {
+    const st = G.state, cost = C.partPrice(id) * qty;
+    if (qty <= 0 || st.team.money < cost) return false;
+    C.pay(cost); st.inventory[id] = (st.inventory[id] || 0) + qty;
+    return true;
+  };
   /** Standard hours for the next level of a concept: the same for every team, in steps of 5. */
   C.baseHours = function (subId) {
     const s = G.state.robot.subs[subId];
@@ -144,8 +168,9 @@
   };
   C.startUpgrade = function (subId) {
     if (C.canUpgrade(subId)) return false;
-    const s = G.state.robot.subs[subId];
-    C.pay(C.levelCost(subId));
+    const st = G.state, s = st.robot.subs[subId], need = C.recipe(subId), short = C.missing(subId);
+    Object.keys(short).forEach((id) => C.buyPart(id, short[id]));
+    Object.keys(need).forEach((id) => { st.inventory[id] -= need[id]; st.robot.used[id] = (st.robot.used[id] || 0) + need[id]; });
     s.active = true; s.progress = 0;
     return true;
   };
@@ -187,7 +212,9 @@
   /** Team hours available this week. */
   C.hours = function () {
     const st = G.state;
-    return st.students.length * 5 + 10 + (st.facilities.space ? 6 : 0) + (st.overtime ? 18 : 0);
+    const weekly = st.students.length * 5 + 10 + (st.facilities.space ? 6 : 0);
+    // An offseason month is lighter than four build-season weeks.
+    return Math.max(0, (C.inPre() ? Math.round(weekly * 1.5) : weekly + (st.overtime ? 18 : 0)) + (st.hoursMod || 0));
   };
   C.used = () => Object.values(G.state.alloc).reduce((a, b) => a + b, 0);
   C.locked = function (id) {
@@ -294,26 +321,105 @@
     C.news('Arrived at the ' + cal.name + '. Entry and travel: ' + U.money(cal.fee) + '.');
   }
 
-  /** Advance one week. Returns 'event' | 'review' | 'kickoff' | 'week'. */
+  /** Advance one turn: a month in the offseason, a week in season.
+      Returns 'inbox' (decisions waiting) | 'month' | 'kickoff' | 'week' | 'event' | 'review'. */
   C.advanceWeek = function () {
     const st = G.state;
     if (st.event || st.phase === 'review') return 'blocked';
+    if (C.pending()) return 'inbox';
     applyWork();
-    st.morale = U.clamp(st.morale + (st.overtime ? -5 : st.morale < 75 ? 2 : 0), 5, 100);
+    st.hoursMod = 0;
+    st.morale = U.clamp(st.morale + (st.overtime && !C.inPre() ? -5 : st.morale < 75 ? 2 : 0), 5, 100);
     st.pitched = false;
-    const next = C.nextEvent();
-    if (!next) { C.makeReview(); return 'review'; }
-    st.week++;
-    let out = 'week';
-    if (st.week === D.WEEKS.kickoff) {
-      st.kickoff = true;
-      C.pay(300);
-      C.news('KICKOFF! This season\'s game is ' + D.game(st.game).name + '. Season registration: $300.');
-      st.modal = 'kickoff';
-      out = 'kickoff';
+    let out;
+    if (C.inPre()) {
+      const before = C.hours();
+      st.month++;
+      out = 'month';
+      if (st.month === D.VENDOR_MONTH) C.mail('Vendors', 'Summer product launches', 'This year\'s new products are in the Shop: ' + st.vendor.map((id) => D.VENDOR.find((x) => x.id === id).name).join(', ') + '. Parts are also at list price until kickoff.');
+      if (st.month >= D.MONTHS.length) {
+        st.period = 'season'; st.week = 1; st.kickoff = true;
+        C.pay(300);
+        C.news('KICKOFF! This season\'s game is ' + D.game(st.game).name + '. Season registration: $300.');
+        st.modal = 'kickoff';
+        out = 'kickoff';
+        // Carry the plan over at the weekly scale.
+        const k = C.hours() / before;
+        Object.keys(st.alloc).forEach((id) => { st.alloc[id] = Math.floor(st.alloc[id] * k); });
+      }
+    } else {
+      const next = C.nextEvent();
+      if (!next) { C.makeReview(); return 'review'; }
+      st.week++;
+      out = 'week';
+      if (st.week === next.week) { startEvent(next); out = 'event'; }
     }
-    if (st.week === next.week) { startEvent(next); out = 'event'; }
+    rollInbox();
+    C.sanitizeAlloc();
     return out;
+  };
+
+  /* ---------- Inbox ---------- */
+  C.mail = function (from, title, body) {
+    const st = G.state;
+    st.inbox.unshift({ id: 'm' + st.inbox.length + '_' + Math.floor(G.rand() * 1e6), info: true, done: true, from, title, body, date: C.dateLabel(), season: st.season });
+    if (st.inbox.length > 40) st.inbox.length = 40;
+  };
+  C.pending = () => G.state.inbox.filter((m) => !m.done).length;
+  const fill = (text, vars) => text.replace(/\{(\w+)\}/g, (_, k) => (vars && vars[k]) || '');
+  C.msgText = (m, key) => { const t = D.INBOX.find((x) => x.id === m.t); return fill(t ? t[key] : m[key], m.vars); };
+  C.msgOptions = (m) => (m.info ? [] : D.INBOX.find((x) => x.id === m.t).options);
+  function rollInbox() {
+    const st = G.state, pre = C.inPre();
+    if (G.rand() > (pre ? 0.8 : 0.45)) return;
+    const hasRobot = st.kickoff && Object.values(st.robot.subs).some((s) => s.level > 0);
+    const ok = D.INBOX.filter((t) => !st.recent.includes(t.id) && (t.when === 'any' || t.when === (pre ? 'pre' : 'season')) &&
+      (!t.need || (t.need === 'sponsor' && st.sponsors.length) || (t.need === 'mentor' && st.mentors.length) || (t.need === 'robot' && hasRobot)));
+    if (!ok.length) return;
+    const t = U.pick(ok);
+    const vars = { sponsor: st.sponsors.length ? U.pick(st.sponsors).name : '', mentor: st.mentors.length ? U.pick(st.mentors).name : '' };
+    st.inbox.unshift({ id: 'd' + st.season + '_' + Math.floor(G.rand() * 1e9), t: t.id, vars, done: false, date: C.dateLabel(), season: st.season });
+    st.recent.push(t.id);
+    if (st.recent.length > 9) st.recent.shift();
+  }
+  /** Plain-language summary of what an option does. */
+  C.fxText = function (fx) {
+    const out = [], sign = (n) => (n > 0 ? '+' : '−') + Math.abs(n);
+    if (fx.hours) out.push(sign(fx.hours) + ' h this ' + C.turn());
+    if (fx.money) out.push((fx.money > 0 ? '+' : '−') + U.money(Math.abs(fx.money)));
+    [['rep', 'reputation'], ['morale', 'morale'], ['rel', 'reliability'], ['practice', 'practice'], ['portfolio', 'portfolio'], ['outreach', 'outreach']].forEach((x) => { if (fx[x[0]]) out.push(sign(fx[x[0]]) + ' ' + x[1]); });
+    if (fx.train) out.push('students learn');
+    if (fx.parts) out.push(Object.keys(fx.parts).map((id) => '+' + fx.parts[id] + ' ' + D.part(id).name).join(', '));
+    return out.join(' · ');
+  };
+  function applyFx(fx, vars) {
+    const st = G.state;
+    if (fx.money > 0) C.earn(fx.money); else if (fx.money < 0) C.pay(-fx.money);
+    if (fx.rep) C.rep(fx.rep);
+    if (fx.morale) st.morale = U.clamp(st.morale + fx.morale, 5, 100);
+    if (fx.hours) { st.hoursMod = (st.hoursMod || 0) + fx.hours; C.sanitizeAlloc(); }
+    if (fx.rel) st.robot.rel = U.clamp(st.robot.rel + fx.rel, 20, 96);
+    if (fx.practice) st.practice = U.clamp(st.practice + fx.practice, 0, 100);
+    if (fx.portfolio) st.awards.portfolio = Math.min(100, st.awards.portfolio + fx.portfolio);
+    if (fx.outreach) st.awards.outreach = Math.min(100, st.awards.outreach + fx.outreach);
+    for (let i = 0; i < (fx.train || 0); i++) grow(null, 1);
+    if (fx.parts) Object.keys(fx.parts).forEach((id) => { st.inventory[id] = (st.inventory[id] || 0) + fx.parts[id]; });
+    if (fx.loseMentor) { const i = st.mentors.findIndex((m) => m.name === vars.mentor); if (i >= 0) C.dismiss(i); }
+  }
+  C.canChoose = (opt) => !(opt.fx.money < 0 && G.state.team.money < -opt.fx.money);
+  C.decide = function (msgId, index) {
+    const st = G.state, m = st.inbox.find((x) => x.id === msgId);
+    if (!m || m.done) return false;
+    const opt = C.msgOptions(m)[index];
+    if (!opt || !C.canChoose(opt)) return false;
+    applyFx(opt.fx, m.vars);
+    m.done = true; m.choice = index; m.result = '';
+    if (opt.risk) {
+      const r = G.rand() < opt.risk.p ? opt.risk.win : opt.risk.lose;
+      applyFx(r.fx, m.vars);
+      m.result = fill(r.text, m.vars);
+    }
+    return true;
   };
 
   C.finishEvent = function () {
@@ -378,17 +484,19 @@
   };
   C.invite = function (i) {
     const st = G.state, m = st.mentorPool[i];
-    if (!m || st.mentors.length >= C.mentorSlots() || st.team.rep < m.minRep) return false;
+    if (!m || st.mentors.length >= C.mentorSlots() || st.team.rep < m.minRep || st.team.money < m.cost) return false;
+    C.pay(m.cost);
     st.mentors.push(m); st.mentorPool.splice(i, 1);
-    C.news(m.name + ' joins as a ' + D.MENTOR_AREAS[m.area] + ' mentor.');
+    C.news(m.name + ' joins as a ' + D.MENTOR_AREAS[m.area] + ' mentor. Expenses for the season: ' + U.money(m.cost) + '.');
     return true;
   };
   C.dismiss = function (i) { const m = G.state.mentors.splice(i, 1)[0]; if (m && G.state.compass === m.name) G.state.compass = null; };
   /** One mentor per season can be put forward for the Compass Award. */
   C.nominate = function (i) { const m = G.state.mentors[i]; if (m) G.state.compass = m.name; };
+  C.vendorOpen = () => !C.inPre() || G.state.month >= D.VENDOR_MONTH;
   C.buyPerk = function (id) {
     const st = G.state, x = D.VENDOR.find((p) => p.id === id);
-    if (!x || st.perks[id] || !st.vendor.includes(id) || st.team.money < x.cost) return false;
+    if (!x || st.perks[id] || !st.vendor.includes(id) || !C.vendorOpen() || st.team.money < x.cost) return false;
     C.pay(x.cost); st.perks[id] = true;
     return true;
   };
@@ -421,14 +529,19 @@
     });
     const lost = st.sponsors.length - kept.length;
     st.sponsors = kept;
-    st.season++; st.year++; st.week = 1; st.phase = 'play'; st.kickoff = false; st.review = null;
+    const mentorBill = st.mentors.reduce((a, m) => a + (m.cost || 0), 0);
+    if (mentorBill) C.pay(mentorBill);
+    const salvaged = [];
+    Object.keys(st.robot.used || {}).forEach((id) => { const n = Math.floor(st.robot.used[id] * D.SALVAGE); if (n) { st.inventory[id] = (st.inventory[id] || 0) + n; salvaged.push(n + ' ' + D.part(id).name); } });
+    st.season++; st.year++; st.phase = 'play'; st.kickoff = false; st.review = null;
     st.flags = {}; st.alloc = {}; st.overtime = false; st.pitched = false;
     st.awards = { portfolio: 0, outreach: Math.round(st.awards.outreach * 0.3) };
     st.practice = Math.round(st.practice * 0.35);
     st.robot = freshRobot();
     G.World.newSeason(st.world);
     setupSeason(st);
-    C.news('Summer vendor launches are in: see Finance for this year\'s new products.');
+    if (salvaged.length) C.news('Stripped last year\'s robot for parts: ' + salvaged.join(', ') + '.');
+    if (mentorBill) C.news('Mentor expenses for the new season: ' + U.money(mentorBill) + '.');
     C.news('Season ' + st.season + ' begins. ' + recruits + ' new students join' + (r.graduating.length ? ', ' + r.graduating.length + ' graduated' : '') +
       '. ' + kept.length + ' sponsor' + (kept.length === 1 ? '' : 's') + ' renewed' + (lost ? ', ' + lost + ' left' : '') + '.');
   };
