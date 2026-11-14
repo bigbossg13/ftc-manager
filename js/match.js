@@ -9,7 +9,8 @@
   const T = D.MATCH;
   M.DT = DT;
 
-  const pos = (side, p) => (side ? [1 - p[0], 1 - p[1]] : [p[0], p[1]]);
+  /** Blue's copy of a red field position: rotated 180 degrees, or mirrored top-to-bottom on fields laid out that way. */
+  const pos = (M.pos = (side, p, L) => (!side ? [p[0], p[1]] : L.mirror === 'y' ? [p[0], 1 - p[1]] : [1 - p[0], 1 - p[1]]));
   const dist = (r, x, y) => Math.hypot(r.x - x, r.y - y);
 
   function log(m, side, text) { m.log.push({ t: m.t, side, text }); }
@@ -28,7 +29,7 @@
     const m = { game: game.id, t: 0, done: false, robots: [], count: [0, 0], log: [], rng, teleStarted: false,
       score: [{ auto: 0, tele: 0, end: 0, pen: 0 }, { auto: 0, tele: 0, end: 0, pen: 0 }] };
     [red, blue].forEach((al, side) => al.forEach((e, idx) => {
-      const p = pos(side, game.layout.start[idx]);
+      const p = pos(side, game.layout.start[idx], game.layout);
       const plan = Object.assign({ auto: 'std', focus: 'high', end: 'normal', pace: 'normal' }, e.plan || {});
       const k = plan.auto === 'bold' ? 1.6 : plan.auto === 'safe' ? 0.5 : 1;
       const r = { side, idx, id: e.id, num: e.num, name: e.name, isPlayer: !!e.isPlayer, perf: e.perf, plan,
@@ -55,19 +56,19 @@
     const rng = m.rng;
     if (!auto && !r.endDone && m.t >= T.endgame && (r.endNow || m.t >= r.endAt)) {
       r.tryTier = bestTier(g, r);
-      return go(r, pos(r.side, g.layout.end), 'toEnd');
+      return go(r, pos(r.side, g.layout.end, g.layout), 'toEnd');
     }
     if (r.carrying) {
       const canHigh = r.perf.scorer >= g.high.req;
       const f = r.plan.focus;
       r.goal = canHigh && (f === 'high' || (f === 'mix' && rng() < 0.5)) ? 'high' : 'low';
-      return go(r, pos(r.side, g.layout[r.goal]), 'toGoal');
+      return go(r, pos(r.side, g.layout[r.goal], g.layout), 'toGoal');
     }
     if (auto) {
       if (r.autoLeft <= 0) { r.state = 'wait'; return; }
       r.autoLeft--;
     }
-    const zones = g.layout.collect.map((z) => pos(r.side, z)).sort((a, b) => dist(r, a[0], a[1]) - dist(r, b[0], b[1]));
+    const zones = g.layout.collect.map((z) => pos(r.side, z, g.layout)).sort((a, b) => dist(r, a[0], a[1]) - dist(r, b[0], b[1]));
     go(r, zones[rng() < 0.7 ? 0 : 1], 'toCollect');
   }
 

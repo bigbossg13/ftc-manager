@@ -58,7 +58,18 @@
       set: { size: 3, bonus: 3, name: 'pattern match' },
       end: [{ name: 'Partially in base', pts: 5, req: 0 }, { name: 'Fully in base', pts: 10, req: 25 }, { name: 'Full return with partner bonus', pts: 20, req: 55 }],
       collectTime: 0.8, scoreTime: 0.75,
-      layout: { start: [[0.1, 0.2], [0.55, 0.92]], collect: [[0.45, 0.3], [0.45, 0.6], [0.9, 0.9]], low: [0.16, 0.2], high: [0.08, 0.08], end: [0.3, 0.75] },
+      // Laid out from the official flat field: goals in the left corners, bases and
+      // loading zones on the right, alliances mirrored top-to-bottom.
+      layout: { mirror: 'y', start: [[0.17, 0.21], [0.92, 0.45]],
+        collect: [[0.42, 0.165], [0.585, 0.165], [0.755, 0.165], [0.92, 0.92]],
+        low: [0.33, 0.2], high: [0.22, 0.27], end: [0.767, 0.733], aim: { low: [0.3, 0.045], high: [0.06, 0.09] },
+        deco: [
+          { c: 'grey', fill: 0.5, p: [[0, 0], [0.52, 0], [0.52, 0.045], [0, 0.045]] }, { c: 'grey', fill: 0.5, p: [[0, 1], [0.52, 1], [0.52, 0.955], [0, 0.955]] },
+          { c: 'red', fill: 0.85, p: [[0, 0.045], [0.15, 0.045], [0, 0.17]] }, { c: 'blue', fill: 0.85, p: [[0, 0.955], [0.15, 0.955], [0, 0.83]] },
+          { c: 'white', p: [[0.1, 0.1], [0.5, 0.5], [0.1, 0.9]] }, { c: 'white', p: [[1, 0.335], [0.835, 0.5], [1, 0.665]] },
+          { c: 'white', p: [[0.835, 0], [0.835, 0.165], [1, 0.165]] }, { c: 'white', p: [[0.835, 1], [0.835, 0.835], [1, 0.835]] },
+          { c: 'blue', close: true, p: [[0.705, 0.205], [0.83, 0.205], [0.83, 0.33], [0.705, 0.33]] }, { c: 'red', close: true, p: [[0.705, 0.67], [0.83, 0.67], [0.83, 0.795], [0.705, 0.795]] },
+        ] },
     },
     {
       id: 'biobuzz', real: true, year: 2026, provisional: true, name: 'BIOBUZZ', element: 'pollen', elements: 'pollen', color: '#f5c518',

@@ -4,7 +4,6 @@
   const D = G.Data, M = G.Match;
   const V = (G.MatchView = { m: null, speed: 2, acc: 0, last: 0, raf: 0, onDone: null, finished: false, logN: -1 });
   const RED = '#e5484d', BLUE = '#3e7bfa';
-  const pos = (side, p) => (side ? [1 - p[0], 1 - p[1]] : p);
   const $ = (id) => document.getElementById(id);
 
   V.start = function (m, onDone) {
@@ -60,11 +59,22 @@
     const px = (v) => v * S;
     c.clearRect(0, 0, S, S);
     c.fillStyle = '#262b34'; c.fillRect(0, 0, S, S);
-    c.fillStyle = 'rgba(229,72,77,.10)'; c.fillRect(0, 0, S * 0.18, S);
-    c.fillStyle = 'rgba(62,123,250,.10)'; c.fillRect(S * 0.82, 0, S * 0.18, S);
+    if (L.mirror !== 'y') {
+      c.fillStyle = 'rgba(229,72,77,.10)'; c.fillRect(0, 0, S * 0.18, S);
+      c.fillStyle = 'rgba(62,123,250,.10)'; c.fillRect(S * 0.82, 0, S * 0.18, S);
+    }
     c.strokeStyle = '#343b48'; c.lineWidth = 1;
     for (let i = 1; i < 6; i++) { c.beginPath(); c.moveTo(px(i / 6), 0); c.lineTo(px(i / 6), S); c.moveTo(0, px(i / 6)); c.lineTo(S, px(i / 6)); c.stroke(); }
     c.textAlign = 'center'; c.textBaseline = 'middle';
+    const pos = (side, p) => M.pos(side, p, L), aim = L.aim || L;
+    // Game-specific field markings, in absolute field coordinates.
+    (L.deco || []).forEach((d) => {
+      const col = { red: RED, blue: BLUE, white: '#f2f2f2', grey: '#6b7280' }[d.c];
+      c.beginPath();
+      d.p.forEach((q, i) => (i ? c.lineTo(px(q[0]), px(q[1])) : c.moveTo(px(q[0]), px(q[1]))));
+      if (d.fill) { c.closePath(); c.fillStyle = col; c.globalAlpha = d.fill; c.fill(); c.globalAlpha = 1; }
+      else { if (d.close) c.closePath(); c.strokeStyle = col; c.lineWidth = px(0.008); c.stroke(); }
+    });
 
     [0, 1].forEach((side) => {
       const col = side ? BLUE : RED;
@@ -76,9 +86,9 @@
         c.globalAlpha = 1;
       });
       const e = pos(side, L.end);
-      c.setLineDash([px(0.012), px(0.008)]); c.strokeStyle = col; c.lineWidth = 2 * dpr;
-      c.strokeRect(px(e[0] - 0.075), px(e[1] - 0.085), px(0.15), px(0.17)); c.setLineDash([]);
-      const lo = pos(side, L.low), hi = pos(side, L.high);
+      c.strokeStyle = col; c.lineWidth = 2 * dpr;
+      if (!L.deco) { c.setLineDash([px(0.012), px(0.008)]); c.strokeRect(px(e[0] - 0.075), px(e[1] - 0.085), px(0.15), px(0.17)); c.setLineDash([]); }
+      const lo = pos(side, aim.low), hi = pos(side, aim.high);
       c.fillStyle = col; c.globalAlpha = 0.3; c.fillRect(px(lo[0] - 0.04), px(lo[1] - 0.04), px(0.08), px(0.08)); c.globalAlpha = 1;
       c.strokeRect(px(lo[0] - 0.04), px(lo[1] - 0.04), px(0.08), px(0.08));
       c.globalAlpha = 0.55; c.beginPath(); c.arc(px(hi[0]), px(hi[1]), px(0.05), 0, 7); c.fill(); c.globalAlpha = 1; c.stroke();
