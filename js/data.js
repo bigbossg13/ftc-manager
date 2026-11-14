@@ -29,10 +29,11 @@
     {
       id: 'centerstage', real: true, year: 2023, name: 'CENTERSTAGE', element: 'pixel', elements: 'pixels', color: '#e9e9ee',
       tagline: 'Build mosaics on the backdrop, hang from the rigging and launch a drone.',
-      keys: ['Pixels are a full field away: speed matters', 'Team prop detection is worth 20 in autonomous', 'Suspend and drone together are worth 50'],
+      keys: ['Pixels are a full field away: speed matters', 'Team prop detection is worth 40 in autonomous', 'Suspend and drone together are worth 50'],
       scorer: ['Drop Bucket', 'Linear Slides', 'Slides + Pixel Aligner'],
-      low: { name: 'Backstage', pts: 1, auto: 3 }, high: { name: 'Backdrop', pts: 3, auto: 5, req: 30 },
-      autoMult: 1, autoLeave: 5, autoBonus: { name: 'Team prop bonus pixels', pts: 20, req: 35 },
+      // Pixels placed in autonomous score again at the end of the match.
+      low: { name: 'Backstage', pts: 1, auto: 4 }, high: { name: 'Backdrop', pts: 3, auto: 8, req: 30 },
+      autoMult: 1, autoLeave: 5, autoBonus: { name: 'Purple and yellow pixels placed by team prop', pts: 40, req: 40 },
       set: { size: 5, bonus: 10, name: 'mosaic or set line' },
       end: [{ name: 'Park backstage', pts: 5, req: 0 }, { name: 'Suspend from the rigging', pts: 20, req: 35 }, { name: 'Suspend and land the drone', pts: 50, req: 62 }],
       collectTime: 0.95, scoreTime: 1.05,
