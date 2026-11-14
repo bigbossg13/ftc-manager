@@ -47,7 +47,7 @@ function playEvent() {
 }
 
 for (let c = 0; c < careers; c++) {
-  C.newGame({ name: 'Bots', number: 4242, difficulty: 'normal', format, seed: 1000 + c * 77 });
+  C.newGame({ name: 'Bots', number: 4242, difficulty: process.argv[5] || 'normal', format, seed: 1000 + c * 77 });
   for (let s = 0; s < seasons; s++) {
     let guard = 0;
     while (G.state.phase !== 'review' && guard++ < 60) {

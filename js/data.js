@@ -273,10 +273,12 @@
   ];
 
   D.CAREER_SEASONS = 5;
+  /* Starting situations. skill is added to every starting student's skills. */
   D.DIFFICULTY = {
-    easy: { name: 'Well-Funded Rookie', money: 4500, rep: 22, desc: 'A supportive school and a starter grant.' },
-    normal: { name: 'Garage Team', money: 2800, rep: 15, desc: 'A kit of parts, a folding table and big plans.' },
-    hard: { name: 'Shoestring', money: 1400, rep: 8, desc: 'Borrowed tools and no sponsors. Good luck.' },
+    dynasty: { name: 'Powerhouse Dynasty', money: 10000, rep: 62, skill: 28, roster: 12, facilities: ['printer', 'field'], desc: 'A decorated program with veterans, a practice field and sponsors who expect Worlds.' },
+    easy: { name: 'Well-Funded Rookie', money: 5000, rep: 22, skill: 0, roster: 8, desc: 'A supportive school and a starter grant.' },
+    normal: { name: 'Garage Team', money: 3000, rep: 15, skill: 0, roster: 8, desc: 'A kit of parts, a folding table and big plans.' },
+    hard: { name: 'Shoestring', money: 1500, rep: 8, skill: 0, roster: 8, desc: 'Borrowed tools and no sponsors. Good luck.' },
   };
 
   D.GOALS = [

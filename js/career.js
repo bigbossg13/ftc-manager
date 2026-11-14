@@ -89,7 +89,8 @@
       world: null, calendar: [], event: null, flags: {}, news: [], history: [],
       ledger: { income: 0, spent: 0 }, pitched: false, review: null, goal: 0, modal: null,
     });
-    [9, 9, 10, 10, 10, 11, 11, 12].forEach((g) => st.students.push(student(g, 14 + (g - 9) * 5, 34 + (g - 9) * 7)));
+    [9, 9, 10, 10, 10, 11, 11, 12, 9, 10, 11, 12].slice(0, diff.roster).forEach((g) => st.students.push(student(g, 14 + (g - 9) * 5 + diff.skill, 34 + (g - 9) * 7 + diff.skill)));
+    (diff.facilities || []).forEach((f) => { st.facilities[f] = true; });
     st.world = G.World.create(st.team.number);
     if (st.mode === 'single') {
       const g = D.game(opts.game) || D.GAMES[0];
