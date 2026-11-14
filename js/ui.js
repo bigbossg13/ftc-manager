@@ -205,7 +205,14 @@
     return '<div class="grid"><div class="card c7"><div class="row spread"><h3>Parts</h3><span class="tag ' + (C.inPre() ? 'a' : '') + '">' + (C.inPre() ? 'Offseason: list price' : 'In season: +' + Math.round(D.IN_SEASON_MARKUP * 100) + '% rush shipping') + '</span></div>' +
       '<div class="scroll"><table><tr><th>Part</th><th class="right">Price</th><th class="right">At vendors</th><th class="right">You have</th><th class="right">Buy</th></tr>' + parts + '</table></div>' +
       '<p class="muted" style="margin-top:8px">' + (C.inPre() ? 'Shelves are full all offseason. Once the game is revealed every team orders at once: stock halves at kickoff and parts can sell out for a week at a time.' : 'Each week a part either sells out or is partly restocked. Sell-outs are most common in the first ' + D.SELLOUT.rushWeeks + ' weeks after kickoff.') + '</p></div>' +
-      '<div class="card c5"><h3>New from vendors</h3>' + vend + '</div></div>';
+      '<div class="card c5"><h3>New from vendors</h3>' + vend + '</div>' +
+      '<div class="card c12"><div class="row spread"><h3>Season field kit</h3><span class="tag ' + (C.inPre() ? 'a' : '') + '">' + (C.inPre() ? 'Preorder price: ships at kickoff' : 'After kickoff: +' + Math.round(D.FIELD_MARKUP * 100) + '%, ' + D.FIELD_DELAY + ' weeks to arrive') + '</span></div>' +
+      '<div class="scroll"><table>' + Object.keys(D.FIELD_KITS).map((type) => { const k = D.FIELD_KITS[type], mine = st.fieldKit && st.fieldKit.type === type, why = C.canBuyKit(type), b = k.bonus;
+        return '<tr><td><b>' + k.name + '</b><div class="muted">' + k.desc + '. +' + Math.round(b.practice * 100) + '% driver practice and testing, +' + Math.round(b.software * 100) + '% software.</div></td><td class="right">' +
+          (mine ? '<span class="tag a">' + (C.kitActive() ? 'In the workshop' : st.kickoff ? 'Arrives week ' + st.fieldKit.arrives : 'Preordered') + '</span>'
+            : st.fieldKit && st.fieldKit.type === 'full' ? '<span class="muted">Covered by the full set</span>'
+            : btn((st.fieldKit ? 'Upgrade · ' : C.inPre() ? 'Preorder · ' : 'Order · ') + U.money(C.kitPrice(type)), 'kit', type, { off: !!why, title: why, cls: 'small' })) + '</td></tr>'; }).join('') + '</table></div>' +
+      '<p class="muted" style="margin-top:8px">The game elements for the coming season, to practise and tune on. They are specific to one game, so a kit lasts one season' + (C.inPre() ? ', and you are ordering before you know what the game is' : '') + '. The field perimeter on the Workshop page is separate and permanent.</p></div></div>';
   }
 
   /* ---------- Workshop: space and equipment ---------- */
@@ -221,6 +228,7 @@
       '<tr><td>Mentor slots</td><td class="right"><b>' + C.mentorSlots() + '</b></td></tr>' +
       '<tr><td>Building</td><td class="right">' + pct(C.facBonus('drive')) + '</td></tr>' +
       '<tr><td>Software</td><td class="right">' + pct(C.facBonus('software')) + '</td></tr>' +
+      '<tr><td>Season field kit</td><td class="right">' + (st.fieldKit ? D.FIELD_KITS[st.fieldKit.type].name.replace(' Game Set', '') + (C.kitActive() ? '' : ' <span class="muted">(on order)</span>') : '<span class="muted">none</span>') + '</td></tr>' +
       '<tr><td>Testing and driver practice</td><td class="right">' + pct(C.facBonus('test')) + '</td></tr>' +
       '<tr><td>Portfolio</td><td class="right">' + pct(C.facBonus('portfolio')) + '</td></tr>' +
       '<tr><td>Outreach and fundraising</td><td class="right">' + pct(C.facBonus('outreach')) + '</td></tr></table>' +
@@ -346,7 +354,7 @@
       '<li><b>Build and compete:</b> Qualifiers in weeks ' + D.WEEKS.q1 + ' and ' + D.WEEKS.q2 + ' (or, in a league region, three meets and a League Tournament). Advance from either to the Regional Championship (week ' + D.WEEKS.regional + '), and from there to the World Championship (week ' + D.WEEKS.worlds + '). You keep improving the robot between events.</li></ul>' +
       '<h2>Building the robot</h2><ul><li>Each week the team has a pool of <b>hours</b>, shown as one bar. Split them between subsystem projects and other jobs by typing hours in.</li><li>Every project has a <b>standard number of hours</b>. Your efficiency in that discipline (skills, mentors, equipment, morale) decides how much of it one of your hours gets done.</li><li>Pick a <b>design concept</b> per subsystem. Simple concepts are cheap and fast but top out early. Advanced ones cost more money and work.</li>' +
       '<li>Every upgrade costs <b>reliability</b>. Spend hours on Test & Tune before an event or watch your robot die on the field.</li><li><b>Driver practice</b> makes cycles faster and penalties rarer.</li></ul>' +
-      '<h2>Parts and the inbox</h2><ul><li>Every upgrade is built from <b>parts</b>. Starting an upgrade uses what is in your inventory and buys the rest. Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more once the season starts, and vendors can <b>sell out</b> of a part for a week, most often right after kickoff. Stock up over the summer.</li><li>Leftover parts carry over, and half of the parts on last year\'s robot are salvaged.</li><li>The <b>inbox</b> brings decisions: sponsor requests, breakdowns, student issues. You must answer them before the calendar moves on.</li></ul><h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
+      '<h2>Parts and the inbox</h2><ul><li>Every upgrade is built from <b>parts</b>. Starting an upgrade uses what is in your inventory and buys the rest. Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more once the season starts, and vendors can <b>sell out</b> of a part for a week, most often right after kickoff. Stock up over the summer.</li><li><b>Field kits</b> are this season\'s game elements to practise on. Preorder one in the Shop before kickoff; afterwards they cost ' + Math.round(D.FIELD_MARKUP * 100) + '% more and take ' + D.FIELD_DELAY + ' weeks to arrive.</li><li>Leftover parts carry over, and half of the parts on last year\'s robot are salvaged.</li><li>The <b>inbox</b> brings decisions: sponsor requests, breakdowns, student issues. You must answer them before the calendar moves on.</li></ul><h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
       '<li>Playoffs are best-of-three semifinals and a final.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. Nominate a mentor on the Team screen for the Compass Award. A great portfolio and outreach record can carry a team with an average robot.</li>' +
       '<li>During a live match you can make <b>coach calls</b>: push for speed at the risk of breakdowns and penalties, play it safe, or send the robot to the endgame early.</li></ul>' +
       '<h2>The long game</h2><ul><li>Meeting your season goal brings a grant and reputation. Reputation unlocks better sponsors, mentors and recruits.</li><li>Seniors graduate. Train the younger students before you need them.</li></ul>' +
@@ -399,6 +407,7 @@
     diff(v) { UI.diff = v; },
     decide(v) { const [id, i] = v.split(':'); C.decide(id, +i); },
     part(v) { const [id, n] = v.split(':'); C.buyPart(id, +n); },
+    kit(v) { C.buyKit(v); },
     mode(v) { UI.mode = v; },
     game(v) { UI.game = v; },
     format(v) { UI.format = v; },

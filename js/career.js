@@ -62,6 +62,7 @@
     st.league = st.format === 'league' ? { ids: U.shuffle(st.world.teams).slice(0, 15).map((t) => t.id), stats: null } : null;
     st.period = 'pre'; st.month = 0; st.week = 0; st.hoursMod = 0;
     st.stock = Object.assign({}, D.STOCK_MAX);
+    st.fieldKit = null;
     C.autoDriveTeam();
     const goal = D.GOALS[st.goal];
     C.mail('School board', 'Season goal', 'This year the board expects the team to: ' + goal.text.charAt(0).toLowerCase() + goal.text.slice(1) + '. Meeting it earns a ' + U.money(goal.grant) + ' grant.');
@@ -269,7 +270,32 @@
     outreach: { pit: 0.15 }, fundraise: { pit: 0.15 }, training: {},
   };
   /** Equipment bonus for a job, as a fraction (0.25 = +25%). */
-  C.facBonus = (id) => Object.keys(FAC[id]).reduce((a, f) => a + (G.state.facilities[f] ? FAC[id][f] : 0), 0);
+  C.facBonus = (id) => Object.keys(FAC[id]).reduce((a, f) => a + (G.state.facilities[f] ? FAC[id][f] : 0), 0) + (C.kitActive() ? D.FIELD_KITS[G.state.fieldKit.type].bonus[id] || 0 : 0);
+
+  /* ---------- Season field kit ---------- */
+  /** True once this season's game elements are in the workshop. */
+  C.kitActive = () => { const st = G.state, k = st.fieldKit; return !!(k && st.kickoff && st.week >= k.arrives); };
+  /** Price now: list price as a preorder, marked up after kickoff. Upgrading half to full pays the difference. */
+  C.kitPrice = function (type) {
+    const st = G.state, rate = C.inPre() ? 1 : 1 + D.FIELD_MARKUP;
+    const credit = st.fieldKit && st.fieldKit.type === 'half' && type === 'full' ? D.FIELD_KITS.half.price : 0;
+    return Math.round((D.FIELD_KITS[type].price - credit) * rate);
+  };
+  C.canBuyKit = function (type) {
+    const st = G.state, k = st.fieldKit;
+    if (k && (k.type === type || k.type === 'full')) return 'Already ordered';
+    if (st.team.money < C.kitPrice(type)) return 'Not enough money';
+    return '';
+  };
+  C.buyKit = function (type) {
+    const st = G.state;
+    if (C.canBuyKit(type)) return false;
+    C.pay(C.kitPrice(type));
+    const pre = C.inPre();
+    st.fieldKit = { type, arrives: pre ? 1 : st.week + D.FIELD_DELAY, preordered: pre };
+    C.news(pre ? D.FIELD_KITS[type].name + ' preordered. It ships at kickoff.' : D.FIELD_KITS[type].name + ' ordered. It arrives in week ' + st.fieldKit.arrives + '.');
+    return true;
+  };
   C.actSkill = (id) => (D.sub(id) ? D.sub(id).skill : D.ACTS.find((a) => a.id === id).skill);
   /** Efficiency: how much progress one assigned hour makes (1.0 = one standard hour). */
   C.eff = function (id) {
@@ -357,6 +383,7 @@
       st.month++;
       out = 'month';
       if (st.month === D.VENDOR_MONTH) C.mail('Vendors', 'Summer product launches', 'This year\'s new products are in the Shop: ' + st.vendor.map((id) => D.VENDOR.find((x) => x.id === id).name).join(', ') + '. Parts are also at list price until kickoff.');
+      if (st.month === D.MONTHS.length - 1 && !st.fieldKit) C.mail('Field supplier', 'Field preorders close at kickoff', 'Game sets for the new season can be preordered in the Shop until kickoff: ' + U.money(D.FIELD_KITS.half.price) + ' for a half field, ' + U.money(D.FIELD_KITS.full.price) + ' for a full one. After the reveal they cost ' + Math.round(D.FIELD_MARKUP * 100) + '% more and take ' + D.FIELD_DELAY + ' weeks to arrive.');
       if (st.month >= D.MONTHS.length) {
         st.period = 'season'; st.week = 1; st.kickoff = true;
         // Kickoff rush: every team orders at once.
@@ -365,6 +392,7 @@
         C.news('KICKOFF! This season\'s game is ' + D.game(st.game).name + '. Season registration: $300.');
         st.modal = 'kickoff';
         out = 'kickoff';
+        if (st.fieldKit) C.news('Your ' + D.FIELD_KITS[st.fieldKit.type].name + ' arrived with the game reveal.');
         // Carry the plan over at the weekly scale.
         const k = C.hours() / before;
         Object.keys(st.alloc).forEach((id) => { st.alloc[id] = Math.floor(st.alloc[id] * k); });
@@ -375,6 +403,7 @@
       st.week++;
       out = 'week';
       restock();
+      if (st.fieldKit && !st.fieldKit.preordered && st.fieldKit.arrives === st.week) C.news('Your ' + D.FIELD_KITS[st.fieldKit.type].name + ' has arrived.');
       if (st.week === next.week) { startEvent(next); out = 'event'; }
     }
     if (out === 'month') restock();

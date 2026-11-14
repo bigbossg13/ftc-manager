@@ -252,10 +252,19 @@
     { id: 'training', name: 'Skills Training', skill: null, desc: 'Workshops that raise student skills for the long run.' },
   ];
 
+  /* ---- Season field kits: this year's game elements to practise on. Preordered
+     kits arrive at kickoff; later orders cost more and take time to ship. ---- */
+  D.FIELD_KITS = {
+    half: { name: 'Half Field Game Set', price: 300, desc: 'One alliance\'s side of this season\'s field', bonus: { practice: 0.2, test: 0.2, software: 0.1 } },
+    full: { name: 'Full Field Game Set', price: 550, desc: 'Every element of this season\'s field', bonus: { practice: 0.4, test: 0.4, software: 0.2 } },
+  };
+  D.FIELD_MARKUP = 0.4;
+  D.FIELD_DELAY = 2; // weeks to arrive when ordered after kickoff
+
   D.FACILITIES = [
     { id: 'printer', name: '3D Printer', cost: 400, desc: '+10% build speed' },
     { id: 'cnc', name: 'CNC Router', cost: 1500, desc: '+15% build speed' },
-    { id: 'field', name: 'Practice Field', cost: 700, desc: '+30% driver practice and testing' },
+    { id: 'field', name: 'Field Perimeter & Tiles', cost: 700, desc: '+30% driver practice and testing, every season' },
     { id: 'sensors', name: 'Sensor & Odometry Kit', cost: 500, desc: '+20% software progress' },
     { id: 'laptops', name: 'Team Laptops', cost: 700, desc: '+10% software and portfolio' },
     { id: 'pit', name: 'Pit Display & Banner', cost: 300, desc: '+15% outreach and fundraising' },
@@ -347,7 +356,7 @@
   ];
   /* Starting situations. skill is added to every starting student's skills. */
   D.DIFFICULTY = {
-    dynasty: { name: 'Powerhouse Dynasty', money: 10000, rep: 62, skill: 28, roster: 12, parts: 4, facilities: ['printer', 'field'], desc: 'A decorated program with veterans, a practice field and sponsors who expect Worlds.' },
+    dynasty: { name: 'Powerhouse Dynasty', money: 10000, rep: 62, skill: 28, roster: 12, parts: 4, facilities: ['printer', 'field'], desc: 'A decorated program with veterans, a field perimeter and sponsors who expect Worlds.' },
     easy: { name: 'Well-Funded Rookie', money: 5000, rep: 22, skill: 0, roster: 8, desc: 'A supportive school and a starter grant.' },
     normal: { name: 'Garage Team', money: 3000, rep: 15, skill: 0, roster: 8, desc: 'A kit of parts, a folding table and big plans.' },
     hard: { name: 'Shoestring', money: 1500, rep: 8, skill: 0, roster: 8, desc: 'Borrowed tools and no sponsors. Good luck.' },

@@ -17,6 +17,7 @@ function botWeek() {
   st.mentorPool.slice().forEach((m) => C.invite(st.mentorPool.indexOf(m)));
   if (st.mentors.length && !st.compass) C.nominate(0);
   st.vendor.forEach((id) => { if (st.team.money > 2500) C.buyPerk(id); });
+  if (!st.fieldKit && st.team.money > 1800) C.buyKit(st.team.money > 4000 ? 'full' : 'half');
   st.alloc = {};
   if (!st.kickoff) { C.setAlloc('fundraise', 18); C.setAlloc('training', 999); return; }
   D.SUBS.forEach((s) => C.startUpgrade(s.id));
