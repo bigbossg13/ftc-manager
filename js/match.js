@@ -9,8 +9,8 @@
   const T = D.MATCH;
   M.DT = DT;
 
-  /** Blue's copy of a red field position: rotated 180 degrees, or mirrored top-to-bottom on fields laid out that way. */
-  const pos = (M.pos = (side, p, L) => (!side ? [p[0], p[1]] : L.mirror === 'y' ? [p[0], 1 - p[1]] : [1 - p[0], 1 - p[1]]));
+  /** Blue's copy of a red field position: rotated 180 degrees, or mirrored top-to-bottom ('y') or left-to-right ('x') on fields laid out that way. */
+  const pos = (M.pos = (side, p, L) => (!side ? [p[0], p[1]] : L.mirror === 'y' ? [p[0], 1 - p[1]] : L.mirror === 'x' ? [1 - p[0], p[1]] : [1 - p[0], 1 - p[1]]));
   const dist = (r, x, y) => Math.hypot(r.x - x, r.y - y);
 
   function log(m, side, text) { m.log.push({ t: m.t, side, text }); }
