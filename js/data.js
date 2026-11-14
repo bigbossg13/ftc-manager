@@ -18,8 +18,9 @@
       tagline: 'Stack cones on spring-loaded junctions and connect your terminals with a circuit.',
       keys: ['High junctions need a tall, steady lift', 'Reading the signal sleeve in autonomous is worth 20', 'Owning junctions adds up over a match'],
       scorer: ['Claw Arm', 'Linear Slides', 'Slides + Turret'],
-      low: { name: 'Low Junction', pts: 3, auto: 3 }, high: { name: 'High Junction', pts: 5, auto: 5, req: 36 },
-      autoMult: 1, autoLeave: 2, autoBonus: { name: 'Parks in the signal zone', pts: 20, req: 30 },
+      // Cones placed in autonomous score again at the end of the match if they stay put.
+      low: { name: 'Low Junction', pts: 3, auto: 6 }, high: { name: 'High Junction', pts: 5, auto: 10, req: 36 },
+      autoMult: 1, autoLeave: 2, autoBonus: { name: 'Parks in the signal zone (team sleeve)', pts: 20, req: 30 },
       set: { size: 3, bonus: 3, name: 'junction (owned)' },
       end: [{ name: 'Park in the terminal', pts: 2, req: 0 }, { name: 'Cap a junction with the beacon', pts: 10, req: 30 }, { name: 'Beacon cap + completed circuit', pts: 30, req: 58 }],
       collectTime: 0.9, scoreTime: 1.15,
