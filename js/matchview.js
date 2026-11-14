@@ -69,7 +69,7 @@
     const pos = (side, p) => M.pos(side, p, L), aim = L.aim || L;
     // Game-specific field markings, in absolute field coordinates.
     (L.deco || []).forEach((d) => {
-      const col = { red: RED, blue: BLUE, white: '#f2f2f2', grey: '#6b7280' }[d.c];
+      const col = { red: RED, blue: BLUE, white: '#f2f2f2', grey: '#6b7280', yellow: '#f5c518' }[d.c];
       c.beginPath();
       d.p.forEach((q, i) => (i ? c.lineTo(px(q[0]), px(q[1])) : c.moveTo(px(q[0]), px(q[1]))));
       if (d.fill) { c.closePath(); c.fillStyle = col; c.globalAlpha = d.fill; c.fill(); c.globalAlpha = 1; }

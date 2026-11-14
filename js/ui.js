@@ -57,12 +57,11 @@
     return '<p>' + g.tagline + '</p><div class="scroll"><table>' +
       '<tr><th>Autonomous (0:30)</th><td>Leave or park: <b>+' + g.autoLeave + '</b>.' + (g.autoBonus ? ' ' + g.autoBonus.name + ': <b>+' + g.autoBonus.pts + '</b> (Auto ' + g.autoBonus.req + '+).' : '') + '</td></tr>' +
       '<tr><th>' + g.low.name + '</th><td><b>' + g.low.pts + '</b> per ' + g.element + ' (<b>' + M.autoPts(g, g.low) + '</b> in auto). Any robot can score here.</td></tr>' +
-      '<tr><th>' + g.high.name + '</th><td><b>' + g.high.pts + '</b> per ' + g.element + ' (<b>' + M.autoPts(g, g.high) + '</b> in auto). Needs Scoring ' + g.high.req + '+.</td></tr>' +
+      '<tr><th>' + g.high.name + '</th><td>' + (g.high.pts ? '<b>' + g.high.pts + '</b> per ' + g.element + ' (<b>' + M.autoPts(g, g.high) + '</b> in auto).' : 'Counts toward the bonus below.') + ' Needs Scoring ' + g.high.req + '+.</td></tr>' +
       (g.set ? '<tr><th>Bonus</th><td>Every ' + g.set.size + ' ' + g.elements + ' your alliance scores: ' + g.set.name + ', <b>+' + g.set.bonus + '</b>.</td></tr>' : '') +
       g.end.map((x, i) => '<tr><th>' + (i ? '' : 'Endgame (last 0:30)') + '</th><td>' + x.name + ': <b>+' + x.pts + '</b>' + (x.req ? ' (Endgame ' + x.req + '+)' : '') + '</td></tr>').join('') +
       '</table></div><p class="muted" style="margin-top:8px">Scouting notes: ' + g.keys.join('. ') + '.</p>' +
-      (g.provisional ? '<p class="warn" style="font-size:13px">Point values for this game are placeholders until the official scoring is entered.</p>'
-        : g.real ? '<p class="muted">A simplified model of the ' + C.yearLabel(g.year) + ' game.</p>' : '');
+      (g.note ? '<p class="muted">' + g.note + '</p>' : '') + (g.real ? '<p class="muted">A simplified model of the ' + C.yearLabel(g.year) + ' game.</p>' : '');
   }
 
   function perfCard() {

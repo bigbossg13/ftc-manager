@@ -13,7 +13,7 @@ The game autosaves to the browser's local storage.
 ## What's in it
 
 - **Five-season career** through POWERPLAY, CENTERSTAGE, INTO THE DEEP, DECODE and BIOBUZZ. Or play any one game, including five simulated ones, as a **single season** graded S to D. Students graduate, recruits arrive, sponsors renew or leave, rival programs rise and fall.
-- **A new game every season**, revealed at kickoff, each with different scoring, field layouts and endgames, so the best robot changes from year to year. BIOBUZZ point values are placeholders until the official scoring is entered in `js/data.js`.
+- **A new game every season**, revealed at kickoff, each with different scoring, field layouts and endgames, so the best robot changes from year to year.
 - **Two region formats.** Qualifiers, or league play: three league meets with carried-over standings, then a League Tournament.
 - **Robot design.** Five subsystems (drivetrain, intake, scoring mechanism, endgame, software), each with three design concepts that trade cost and build time against their ceiling. Experience with a concept carries into later seasons.
 - **Weekly planning.** Split the team's work blocks between building, testing, driver practice, the engineering portfolio, outreach, fundraising and training.

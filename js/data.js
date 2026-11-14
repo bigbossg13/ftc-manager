@@ -74,15 +74,28 @@
         ] },
     },
     {
-      id: 'biobuzz', real: true, year: 2026, provisional: true, name: 'BIOBUZZ', element: 'pollen', elements: 'pollen', color: '#f5c518',
+      // Point values from the season cheat sheet. The sheet does not say how many
+      // pieces tip the hive; six is assumed here.
+      id: 'biobuzz', real: true, year: 2026, name: 'BIOBUZZ', element: 'pollen', elements: 'pollen and nectar', color: '#f5c518',
+      note: 'Assumes six pieces tip the hive. Pieces in the cell pay through the tip rather than one by one, and flower scoring is grouped into three endgame tiers.',
       tagline: 'Launch pollen and nectar into your hive until it tips, then claim the flowers.',
-      keys: ['Enough pollen in the cell tips the hive for a bonus', 'Flowers are contested late in the match', 'Owning a flower means your nectar is on top'],
+      keys: ['A hive tip is worth 20: launching into the cell is the main game', 'The garden is a safe 1 point for robots that cannot reach the hive', 'First nectar into a flower earns the bonus and ownership'],
       scorer: ['Push Launcher', 'Flywheel Launcher', 'Turreted Launcher'],
-      low: { name: 'Flower', pts: 2, auto: 4 }, high: { name: 'Hive Cell', pts: 3, auto: 6, req: 30 },
-      autoMult: 2, autoLeave: 3, set: { size: 4, bonus: 8, name: 'hive tip' },
-      end: [{ name: 'Nectar in a flower', pts: 5, req: 0 }, { name: 'Own a flower', pts: 12, req: 35 }, { name: 'Own several flowers', pts: 25, req: 62 }],
+      low: { name: 'Garden', pts: 1, auto: 1 }, high: { name: 'Hive Cell', pts: 0, auto: 0, req: 30 },
+      autoMult: 1, autoLeave: 3, autoBonus: { name: 'Parks in the loading zone', pts: 5, req: 20 },
+      set: { size: 6, bonus: 20, name: 'hive tip' },
+      end: [{ name: 'Add to a flower', pts: 2, req: 0 }, { name: 'Claim a flower with the first nectar', pts: 7, req: 35 }, { name: 'Claim and fill two flowers', pts: 16, req: 62 }],
       collectTime: 0.85, scoreTime: 0.85,
-      layout: { start: [[0.08, 0.3], [0.08, 0.7]], collect: [[0.5, 0.2], [0.5, 0.8], [0.35, 0.5]], low: [0.3, 0.3], high: [0.1, 0.5], end: [0.6, 0.5] },
+      layout: { start: [[0.08, 0.4], [0.08, 0.62]], collect: [[0.08, 0.25], [0.08, 0.5]], low: [0.1, 0.92], high: [0.27, 0.5], end: [0.09, 0.66],
+        aim: { low: [0.08, 0.955], high: [0.42, 0.5] },
+        deco: [
+          { c: 'red', fill: 0.35, p: [[0.34, 0.37], [0.495, 0.37], [0.495, 0.63], [0.34, 0.63]] }, { c: 'blue', fill: 0.35, p: [[0.505, 0.37], [0.66, 0.37], [0.66, 0.63], [0.505, 0.63]] },
+          { c: 'red', close: true, p: [[0.34, 0.37], [0.495, 0.37], [0.495, 0.63], [0.34, 0.63]] }, { c: 'blue', close: true, p: [[0.505, 0.37], [0.66, 0.37], [0.66, 0.63], [0.505, 0.63]] },
+          { c: 'red', close: true, p: [[0.005, 0.17], [0.085, 0.17], [0.085, 0.33], [0.005, 0.33]] }, { c: 'blue', close: true, p: [[0.995, 0.83], [0.915, 0.83], [0.915, 0.67], [0.995, 0.67]] },
+          { c: 'red', p: [[0, 0.99], [0.17, 0.99]] }, { c: 'blue', p: [[1, 0.01], [0.83, 0.01]] },
+          { c: 'yellow', fill: 0.95, p: [[0.32, 0], [0.36, 0], [0.36, 0.04], [0.32, 0.04]] }, { c: 'yellow', fill: 0.95, p: [[0.96, 0.32], [1, 0.32], [1, 0.36], [0.96, 0.36]] },
+          { c: 'yellow', fill: 0.95, p: [[0, 0.64], [0.04, 0.64], [0.04, 0.68], [0, 0.68]] }, { c: 'yellow', fill: 0.95, p: [[0.64, 0.96], [0.68, 0.96], [0.68, 1], [0.64, 1]] },
+        ] },
     },
   ];
 
