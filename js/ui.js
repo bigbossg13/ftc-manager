@@ -1,0 +1,373 @@
+/* FTC Manager — user interface: every screen is re-rendered from state */
+(function (G) {
+  'use strict';
+  const U = G.U, D = G.Data, C = G.Career, E = G.Event, M = G.Match, V = G.MatchView;
+  const UI = (G.UI = { tab: 'hq', need: null, live: null, liveDone: false, result: null, diff: 'normal' });
+  const app = document.getElementById('app');
+  const e = U.esc;
+
+  /* ---------- small builders ---------- */
+  const bar = (v, cls) => '<div class="bar ' + (cls || '') + '"><i style="width:' + U.clamp(v, 0, 100) + '%"></i></div>';
+  const stat = (label, v, cls) => '<div class="stat"><span>' + label + '</span>' + bar(v, cls) + '<b class="num right">' + Math.round(v) + '</b></div>';
+  const pips = (n, max) => '<span class="pips">' + Array.from({ length: max }, (_, i) => '<i class="' + (i < n ? 'f' : '') + '"></i>').join('') + '</span>';
+  const btn = (label, a, v, o) => '<button class="' + ((o && o.cls) || '') + '" data-a="' + a + '"' + (v !== undefined ? ' data-v="' + e(v) + '"' : '') +
+    (o && o.off ? ' disabled' : '') + (o && o.title ? ' title="' + e(o.title) + '"' : '') + '>' + label + '</button>';
+  const seg = (a, cur, opts) => '<span class="seg">' + opts.map((o) => btn(o[1], a, o[0], { cls: cur === o[0] ? 'on' : '' })).join('') + '</span>';
+  const planSeg = (k, opts) => '<span class="seg">' + opts.map((o) => btn(o[1], 'plan', k + ':' + o[0], { cls: G.state.plan[k] === o[0] ? 'on' : '' })).join('') + '</span>';
+  const relCls = (v) => (v >= 75 ? 'g' : v >= 50 ? 'w' : 'r');
+  const tname = (t) => '<b class="num">' + t.num + '</b> ' + e(t.name);
+
+  /* ---------- menu ---------- */
+  function menu() {
+    return '<div class="menu"><div class="logo">FTC <span>MANAGER</span></div>' +
+      '<p class="muted">Run a robotics team from the garage to the World Championship. You don\'t drive the robot. You build the program behind it.</p>' +
+      (G.hasSave() ? '<div class="card" style="margin:14px 0"><div class="row spread"><b>Saved career found</b>' + btn('Continue', 'continue', undefined, { cls: 'primary' }) + '</div></div>' : '') +
+      '<div class="card"><h2>New career</h2>' +
+      '<div class="field"><label for="tn">Team name</label><input id="tn" type="text" maxlength="28" value="Robo Rookies"></div>' +
+      '<div class="field"><label for="tnum">Team number</label><input id="tnum" type="number" min="1" max="99999" value="' + (10000 + Math.floor(Math.random() * 20000)) + '"></div>' +
+      '<div class="field"><label>Starting situation</label>' +
+      Object.keys(D.DIFFICULTY).map((k) => { const d = D.DIFFICULTY[k]; return '<button class="opt ' + (UI.diff === k ? 'on' : '') + '" data-a="diff" data-v="' + k + '"><b>' + d.name + '</b> · ' + U.money(d.money) + '<div class="muted">' + d.desc + '</div></button>'; }).join('') +
+      '</div>' + btn('Start career', 'new', undefined, { cls: 'primary big' }) + '</div>' +
+      '<p class="muted" style="margin-top:14px">An unofficial fan project. Not affiliated with or endorsed by <i>FIRST</i>. All season games in here are made up.</p></div>';
+  }
+
+  /* ---------- chrome ---------- */
+  function top() {
+    const st = G.state, tabs = [['hq', 'HQ'], ['workshop', 'Workshop'], ['team', 'Team'], ['finance', 'Finance'], ['season', 'Season']];
+    if (st.event) tabs.push(['event', 'Event ●']);
+    tabs.push(['help', 'How to play']);
+    const adv = st.event ? btn('Go to event', 'tab', 'event', { cls: 'primary' })
+      : st.phase === 'review' ? '' : btn('Advance week ▶', 'advance', undefined, { cls: 'primary' });
+    return '<div class="top"><div class="top-in"><span class="badge">' + st.team.number + '</span><span class="teamname">' + e(st.team.name) + '</span>' +
+      '<div class="kpis"><span class="kpi">Season <b>' + st.season + '</b> · Week <b>' + st.week + '</b></span>' +
+      '<span class="kpi">Budget <b class="' + (st.team.money < 0 ? 'bad' : '') + '">' + U.money(st.team.money) + '</b></span>' +
+      '<span class="kpi">Reputation <b>' + Math.round(st.team.rep) + '</b></span><span class="kpi">Morale <b>' + Math.round(st.morale) + '</b></span>' + adv + '</div></div>' +
+      '<nav>' + tabs.map((t) => '<button class="' + (UI.tab === t[0] ? 'on' : t[0] === 'event' ? 'alert' : '') + '" data-a="tab" data-v="' + t[0] + '">' + t[1] + '</button>').join('') + '</nav></div>';
+  }
+
+  function gameInfo(g) {
+    return '<p>' + g.tagline + '</p><div class="scroll"><table>' +
+      '<tr><th>Autonomous (0:30)</th><td>Leave the start: <b>+' + g.autoLeave + '</b>. Every ' + g.element + ' scored counts <b>×' + g.autoMult + '</b>.</td></tr>' +
+      '<tr><th>' + g.low.name + '</th><td><b>' + g.low.pts + '</b> per ' + g.element + '. Any robot can score here.</td></tr>' +
+      '<tr><th>' + g.high.name + '</th><td><b>' + g.high.pts + '</b> per ' + g.element + '. Needs Scoring ' + g.high.req + '+.</td></tr>' +
+      '<tr><th>Bonus</th><td>Every ' + g.set.size + ' ' + g.elements + ' your alliance scores completes a ' + g.set.name + ': <b>+' + g.set.bonus + '</b>.</td></tr>' +
+      g.end.map((x, i) => '<tr><th>' + (i ? '' : 'Endgame (last 0:30)') + '</th><td>' + x.name + ': <b>+' + x.pts + '</b>' + (x.req ? ' (Endgame ' + x.req + '+)' : '') + '</td></tr>').join('') +
+      '</table></div><p class="muted" style="margin-top:8px">Scouting notes: ' + g.keys.join('. ') + '.</p>';
+  }
+
+  function perfCard() {
+    const st = G.state, p = C.playerPerf();
+    return '<div class="card c6"><h3>Robot</h3>' +
+      (st.kickoff ? D.SUBS.map((s) => stat(s.stat, p[{ drive: 'speed', intake: 'intake', scorer: 'scorer', endgame: 'endgame', software: 'auto' }[s.id]])).join('') +
+        stat('Reliability', p.rel, relCls(p.rel)) + stat('Drive team', p.driver, 'b')
+        : '<p class="muted">The game is revealed at kickoff in week ' + D.WEEKS.kickoff + '. Use the preseason to fundraise, sign sponsors, find mentors and train students.</p>') + '</div>';
+  }
+
+  /* ---------- HQ ---------- */
+  function hq() {
+    const st = G.state, next = C.nextEvent(), goal = D.GOALS[st.goal];
+    let up;
+    if (st.event) up = '<h2>You are at the ' + st.event.name + '</h2><p class="muted">Matches are waiting.</p>' + btn('Go to event', 'tab', 'event', { cls: 'primary big' });
+    else if (next) {
+      const wk = next.week - st.week, free = C.blocks() - C.used();
+      up = '<h2>' + (st.kickoff ? 'Next: ' + next.name : 'Preseason') + '</h2>' +
+        '<p>' + (st.kickoff ? '' : 'Kickoff in <b>' + (D.WEEKS.kickoff - st.week) + '</b> week' + (D.WEEKS.kickoff - st.week === 1 ? '' : 's') + '. ') +
+        next.name + ' in <b>' + wk + '</b> week' + (wk === 1 ? '' : 's') + ' (entry ' + U.money(next.fee) + ').</p>' +
+        '<p>Work blocks assigned this week: <b>' + C.used() + ' / ' + C.blocks() + '</b>' + (free ? ' <span class="warn">(' + free + ' idle)</span>' : '') + '</p>' +
+        '<div class="row">' + btn('Plan the week', 'tab', 'workshop') + btn('Advance week ▶', 'advance', undefined, { cls: 'primary big' }) + '</div>';
+    } else up = '<h2>Season complete</h2><p class="muted">No more events for the team this season.</p>' + btn('Go to season review ▶', 'advance', undefined, { cls: 'primary big' });
+    return '<div class="grid"><div class="card c8 hl">' + up + '</div>' +
+      '<div class="card c4"><h3>Season goal</h3><p>' + goal.text + '</p><p class="muted">Meet it for a ' + U.money(goal.grant) + ' grant and a reputation boost. Goals get harder as your reputation grows.</p>' +
+      (st.flags[goal.id] ? '<span class="tag a">Achieved</span>' : '') + '</div>' +
+      perfCard() +
+      '<div class="card c6"><h3>News</h3><ul class="news">' + st.news.map((n) => '<li><span>S' + n.s + ' W' + n.w + '</span>' + e(n.text) + '</li>').join('') + '</ul></div></div>';
+  }
+
+  /* ---------- Workshop ---------- */
+  function stepper(id) {
+    const st = G.state, n = st.alloc[id] || 0, lock = C.locked(id);
+    if (lock) return '<span class="muted">' + lock + '</span>';
+    return '<span class="step">' + btn('−', 'alloc', id + ':-1', { off: n <= 0 }) + '<b>' + n + '</b>' + btn('+', 'alloc', id + ':1', { off: C.used() >= C.blocks() }) + '</span>';
+  }
+  function workshop() {
+    const st = G.state;
+    const subs = D.SUBS.map((s) => {
+      const r = st.robot.subs[s.id], c = C.concept(s.id), n = st.alloc[s.id] || 0;
+      let proj;
+      if (r.active) {
+        const need = C.levelWork(s.id), eta = n ? Math.ceil((need - r.progress) / (n * C.ppb(s.id))) : 0;
+        proj = '<div>Building level ' + (r.level + 1) + '</div>' + bar(r.progress / need * 100) + '<div class="muted">' + Math.round(r.progress) + ' / ' + need + ' work' + (n ? ' · about ' + eta + ' wk' : ' · no one assigned') + '</div>';
+      } else {
+        const why = C.canUpgrade(s.id);
+        proj = why === 'Maxed out' ? '<span class="tag a">Maxed out</span>' : btn('Start level ' + (r.level + 1) + ' · ' + U.money(C.levelCost(s.id)), 'upgrade', s.id, { off: !!why, title: why, cls: why ? '' : 'primary' }) +
+          '<div class="muted">' + (why && why !== 'In progress' ? why : C.levelWork(s.id) + ' work') + '</div>';
+      }
+      return '<tr><td><b>' + s.name + '</b><div class="muted">' + s.stat + ' ' + C.stat(s.id) + '</div></td>' +
+        '<td><select data-c="concept" data-v="' + s.id + '">' + s.concepts.map((x) => '<option value="' + x.id + '"' + (x.id === c.id ? ' selected' : '') + '>' + C.conceptName(s.id, x) + ' (max ' + (x.base + x.per * x.max) + ')</option>').join('') + '</select><div class="muted">' + c.desc + '</div></td>' +
+        '<td>' + pips(r.level, c.max) + '<div class="muted">Level ' + r.level + ' / ' + c.max + '</div></td><td style="min-width:170px">' + proj + '</td><td class="right">' + stepper(s.id) + '</td></tr>';
+    }).join('');
+    const acts = D.ACTS.map((a) => {
+      const n = st.alloc[a.id] || 0, per = C.ppb(a.id);
+      const fx = { test: '+' + (per * 0.2).toFixed(1) + ' reliability', practice: '+' + (per * 0.22).toFixed(1) + ' practice', portfolio: '+' + (per * 0.13).toFixed(1) + ' portfolio',
+        outreach: '+' + (per * 0.13).toFixed(1) + ' outreach', fundraise: '+' + U.money(C.fundPerBlock()), training: 'skill gains for 2 students' }[a.id];
+      return '<tr><td><b>' + a.name + '</b><div class="muted">' + a.desc + '</div></td><td class="muted">' + fx + ' per block' + '</td><td class="right">' + stepper(a.id) + '</td></tr>';
+    }).join('');
+    return '<div class="grid"><div class="card c12"><div class="row spread"><div><h2>This week\'s plan</h2><span class="muted">Each student-team work block goes to one job. Blocks assigned: </span><b>' + C.used() + ' / ' + C.blocks() + '</b></div>' +
+      '<div class="row"><span class="muted">Overtime (+3 blocks, costs morale)</span>' + seg('overtime', st.overtime ? '1' : '0', [['0', 'Off'], ['1', 'On']]) + '</div></div></div>' +
+      '<div class="card c12"><h3>Robot' + (st.kickoff ? ' · ' + D.game(st.game).name : '') + '</h3><div class="scroll"><table><tr><th>Subsystem</th><th>Design concept</th><th>Level</th><th>Project</th><th class="right">Blocks</th></tr>' + subs + '</table></div>' +
+      '<p class="muted" style="margin-top:8px">Changing a concept halves that subsystem\'s level. Experience with a concept carries into future seasons and makes it quicker to build.</p></div>' +
+      '<div class="card c8"><h3>Other work</h3><div class="scroll"><table>' + acts + '</table></div></div>' +
+      '<div class="card c4"><h3>Readiness</h3>' + stat('Reliability', st.robot.rel, relCls(st.robot.rel)) + stat('Practice', st.practice, 'b') + stat('Portfolio', st.awards.portfolio, 'g') + stat('Outreach', st.awards.outreach, 'g') +
+      '<p class="muted" style="margin-top:8px">Unreliable robots jam, brown out or drop off the field entirely. Judges read the portfolio and outreach record for awards.</p></div></div>';
+  }
+
+  /* ---------- Team ---------- */
+  function team() {
+    const st = G.state, dt = st.driveTeam;
+    const rows = st.students.slice().sort((a, b) => b.grade - a.grade).map((s) =>
+      '<tr><td><b>' + e(s.name) + '</b></td><td>Grade ' + s.grade + (s.grade === 12 ? ' <span class="tag">senior</span>' : '') + '</td>' +
+      ['mech', 'soft', 'drive', 'biz'].map((k) => '<td><span class="num">' + Math.round(s[k]) + '</span>' + bar(s[k]) + '</td>').join('') +
+      '<td class="right"><span class="seg">' + btn('Driver', 'role', 'driver:' + s.id, { cls: dt.driver === s.id ? 'on' : '' }) + btn('Operator', 'role', 'operator:' + s.id, { cls: dt.operator === s.id ? 'on' : '' }) + '</span></td></tr>').join('');
+    const mentors = st.mentors.map((m, i) => '<tr><td><b>' + e(m.name) + '</b><div class="muted">' + D.MENTOR_AREAS[m.area] + '</div></td><td>' + pips(m.skill, 5) + '</td><td class="muted">+' + m.skill * 6 + '%</td><td class="right">' + btn('Part ways', 'dismiss', i, { cls: 'small' }) + '</td></tr>').join('');
+    const full = st.mentors.length >= C.mentorSlots();
+    const pool = st.mentorPool.map((m, i) => {
+      const why = full ? 'No free mentor slot' : st.team.rep < m.minRep ? 'Needs reputation ' + m.minRep : '';
+      return '<tr><td><b>' + e(m.name) + '</b><div class="muted">' + D.MENTOR_AREAS[m.area] + '</div></td><td>' + pips(m.skill, 5) + '</td><td class="right">' + btn('Invite', 'invite', i, { off: !!why, cls: 'small' }) + (why ? '<div class="muted">' + why + '</div>' : '') + '</td></tr>';
+    }).join('');
+    return '<div class="grid"><div class="card c12"><h3>Students (' + st.students.length + ') · drive team rating ' + C.driverSkill() + '</h3><div class="scroll"><table><tr><th>Name</th><th>Year</th><th>Mechanical</th><th>Software</th><th>Driving</th><th>Business</th><th class="right">Drive team</th></tr>' + rows + '</table></div>' +
+      '<p class="muted" style="margin-top:8px">The six best students in a skill set the pace for that kind of work. Seniors graduate at the end of the season; outreach and reputation bring in recruits.</p></div>' +
+      '<div class="card c6"><h3>Mentors (' + st.mentors.length + ' / ' + C.mentorSlots() + ')</h3>' + (mentors ? '<table>' + mentors + '</table>' : '<p class="muted">No mentors yet. Volunteers speed up work in their area.</p>') + '</div>' +
+      '<div class="card c6"><h3>Volunteers available</h3>' + (pool ? '<table>' + pool + '</table>' : '<p class="muted">Nobody else is available this season.</p>') + '</div></div>';
+  }
+
+  /* ---------- Finance ---------- */
+  function finance() {
+    const st = G.state;
+    const offers = st.offers.map((o, i) => '<tr><td><b>' + e(o.name) + '</b></td><td class="num">' + U.money(o.amount) + '</td><td class="num">' + Math.round(C.pitchChance(o) * 100) + '%</td><td class="right">' + btn('Pitch', 'pitch', i, { off: st.pitched, cls: 'small primary' }) + '</td></tr>').join('');
+    const fac = D.FACILITIES.map((f) => '<tr><td><b>' + f.name + '</b><div class="muted">' + f.desc + '</div></td><td class="right">' +
+      (st.facilities[f.id] ? '<span class="tag a">Owned</span>' : btn(U.money(f.cost), 'buy', f.id, { off: st.team.money < f.cost, cls: 'small' })) + '</td></tr>').join('');
+    return '<div class="grid"><div class="card c4"><h3>This season</h3><table><tr><td>Budget</td><td class="right num"><b>' + U.money(st.team.money) + '</b></td></tr><tr><td>Income</td><td class="right num good">' + U.money(st.ledger.income) + '</td></tr><tr><td>Spent</td><td class="right num bad">' + U.money(st.ledger.spent) + '</td></tr></table>' +
+      '<h3 style="margin-top:14px">Sponsors</h3>' + (st.sponsors.length ? '<table>' + st.sponsors.map((s) => '<tr><td>' + e(s.name) + '</td><td class="right num">' + U.money(s.amount) + '</td></tr>').join('') + '</table>' : '<p class="muted">None yet.</p>') +
+      '<p class="muted" style="margin-top:8px">Sponsors pay once per season. Most renew if you keep your reputation up and meet your goal.</p></div>' +
+      '<div class="card c8"><h3>Sponsor prospects</h3>' + (offers ? '<div class="scroll"><table><tr><th>Company</th><th>Offer</th><th>Chance</th><th></th></tr>' + offers + '</table></div>' : '<p class="muted">No prospects left this season.</p>') +
+      '<p class="muted" style="margin-top:8px">One pitch per week' + (st.pitched ? ' (done for this week)' : '') + '. A failed pitch closes that door until next season. Reputation and business skills improve your odds.</p></div>' +
+      '<div class="card c12"><h3>Workshop & equipment</h3><div class="scroll"><table>' + fac + '</table></div></div></div>';
+  }
+
+  /* ---------- Season ---------- */
+  function season() {
+    const st = G.state, next = C.nextEvent();
+    const cal = st.calendar.map((c) => {
+      const s = c.summary, off = c.need && !st.flags[c.need] && !c.done;
+      return '<div class="' + (c === next ? 'next' : off ? 'off' : '') + '"><div class="muted">Week ' + c.week + '</div><b>' + c.name + '</b><div class="muted">' +
+        (s ? 'Rank ' + s.rank + '/' + s.of + ' · ' + s.record + '<br>' + s.result + (s.awards.length ? '<br>' + s.awards.join(', ') : '') + (s.advanced ? '<br><span class="good">Advanced</span>' : '')
+          : off ? 'Must qualify' : 'Entry ' + U.money(c.fee)) + '</div></div>';
+    }).join('');
+    const grade = (r) => (r >= 78 ? 'A+' : r >= 66 ? 'A' : r >= 54 ? 'B' : r >= 42 ? 'C' : r >= 30 ? 'D' : 'E');
+    const rivals = st.world.teams.slice().sort((a, b) => b.rating - a.rating).slice(0, 20).map((t) => '<tr><td>' + tname(t) + '</td><td>' + grade(t.rating) + '</td><td>' + (t.qr ? '<span class="tag a">Regional</span>' : '') + '</td></tr>').join('');
+    const hist = st.history.slice().reverse().map((h) => '<tr><td>Season ' + h.season + '</td><td>' + D.game(h.game).name + '</td><td>' + h.events.map((x) => x.name.replace(' Championship', '') + ': ' + x.s.result).join(' · ') + (h.champion ? ' 🏆' : '') + '</td><td>' + (h.met ? '<span class="good">Goal met</span>' : '<span class="muted">Goal missed</span>') + '</td></tr>').join('');
+    return '<div class="grid"><div class="card c12"><h3>Season ' + st.season + ' calendar</h3><div class="timeline"><div class="' + (st.kickoff ? '' : 'next') + '"><div class="muted">Week ' + D.WEEKS.kickoff + '</div><b>Kickoff</b><div class="muted">' + (st.kickoff ? D.game(st.game).name : 'Game reveal') + '</div></div>' + cal + '</div></div>' +
+      '<div class="card c7"><h3>The game</h3>' + (st.kickoff ? '<h2>' + D.game(st.game).name + '</h2>' + gameInfo(D.game(st.game)) : '<p class="muted">Revealed at kickoff.</p>') + '</div>' +
+      '<div class="card c5"><h3>Top programs in your region</h3><div class="scroll"><table><tr><th>Team</th><th>Strength</th><th></th></tr>' + rivals + '</table></div></div>' +
+      (hist ? '<div class="card c12"><h3>Team history</h3><div class="scroll"><table>' + hist + '</table></div></div>' : '') + '</div>';
+  }
+
+  /* ---------- Event ---------- */
+  function ensureNeed() {
+    if (G.state.event && !UI.need && !UI.live && !UI.result) { UI.need = E.advance(G.state.event); G.save(); }
+  }
+  function allianceCard(ev, ids, side) {
+    return '<div class="al-card ' + (side ? 'b' : '') + '"><h3 class="' + (side ? 'bluec' : 'redc') + '">' + (side ? 'Blue' : 'Red') + ' alliance</h3>' + ids.map((id) => {
+      const t = E.team(ev, id), s = ev.stats[id];
+      return '<div style="margin:6px 0">' + tname(t) + (t.isPlayer ? ' <span class="tag a">you</span>' : '') + '<div class="muted">' + s.w + '-' + s.l + '-' + s.t + ' · avg ' + (s.n ? E.avg(ev, id).toFixed(0) + ' pts' : 'unknown') + '</div></div>';
+    }).join('') + '</div>';
+  }
+  function scoreHead(r, b, sub) {
+    return '<div class="score"><div class="al r"><div class="pts" id="sc-r">' + r + '</div><div>' + sub[0] + '</div></div><div class="clock"><b id="clock">2:30</b><div class="muted" id="phase">READY</div></div><div class="al b"><div class="pts" id="sc-b">' + b + '</div><div>' + sub[1] + '</div></div></div>';
+  }
+  const nums = (ev, ids) => ids.map((id) => E.team(ev, id).num).join(' · ');
+
+  function eventMain(ev) {
+    const st = G.state, g = D.game(st.game);
+    if (UI.live) {
+      const m = UI.live.match, p = V.player() || UI.live.m.robots.find((r) => r.isPlayer);
+      return '<h2>' + m.label + '</h2>' + scoreHead(0, 0, [nums(ev, m.red), nums(ev, m.blue)]) + '<canvas id="field"></canvas>' +
+        '<div class="row spread" style="margin:10px 0"><div class="row"><span class="muted">Speed</span>' + seg('speed', String(V.speed), [['1', '1×'], ['2', '2×'], ['4', '4×'], ['8', '8×']]) + btn('Skip to end', 'skip', undefined, { off: UI.liveDone }) + '</div>' +
+        (UI.liveDone ? btn('Continue ▶', 'finishLive', undefined, { cls: 'primary' }) : '') + '</div>' +
+        '<div class="row" style="margin-bottom:10px"><span class="muted">Coach calls</span>' + seg('pace', p.plan.pace, [['safe', 'Play it safe'], ['normal', 'Normal'], ['push', 'Push!']]) +
+        '<button id="endnow" data-a="endnow" disabled>Go for endgame now</button></div><ul class="mlog" id="mlog"></ul>';
+    }
+    if (UI.result) {
+      const { match: m, res } = UI.result, side = m.red.includes('P') ? 0 : 1;
+      const mine = side ? res.b : res.r, theirs = side ? res.r : res.b;
+      const head = mine > theirs ? '<span class="good">Victory</span>' : mine < theirs ? '<span class="bad">Defeat</span>' : 'Tie';
+      const row = (label, k) => '<tr><td class="right num">' + res.score[0][k] + '</td><th class="center">' + label + '</th><td class="num">' + res.score[1][k] + '</td></tr>';
+      const contrib = (ids) => ids.map((id) => E.team(ev, id).num + ': ' + res.contrib[id] + ' pts').join(' · ');
+      return '<h2>' + m.label + ' · ' + head + '</h2>' + scoreHead(res.r, res.b, [contrib(m.red), contrib(m.blue)]).replace('2:30', 'FINAL').replace('READY', '') +
+        '<table>' + row('Autonomous', 'auto') + row('Teleop', 'tele') + row('Endgame', 'end') + row('Opponent penalties', 'pen') + '</table>' +
+        '<ul class="mlog" style="margin-top:10px">' + UI.result.log.filter((l) => l.side >= 0).slice(-12).map((l) => '<li class="' + (l.side ? 'bluec' : 'redc') + '">' + e(l.text) + '</li>').join('') + '</ul>' +
+        '<div class="row" style="margin-top:12px">' + btn('Continue ▶', 'next', undefined, { cls: 'primary big' }) + '</div>';
+    }
+    const need = UI.need;
+    if (!need) return '';
+    if (need.need === 'match') {
+      const m = need.match, side = m.red.includes('P') ? 0 : 1, p = C.playerPerf();
+      const canHigh = p.scorer >= g.high.req;
+      return '<h2>' + m.label + '</h2><p class="muted">You are on the <b class="' + (side ? 'bluec' : 'redc') + '">' + (side ? 'blue' : 'red') + '</b> alliance. Set the match plan, then watch or simulate.</p>' +
+        '<div class="vs">' + allianceCard(ev, m.red, 0) + allianceCard(ev, m.blue, 1) + '</div>' +
+        '<h3 style="margin-top:14px">Match plan</h3><table>' +
+        '<tr><td>Autonomous</td><td>' + planSeg('auto', [['safe', 'Safe'], ['std', 'Standard'], ['bold', 'Ambitious']]) + '<div class="muted">Ambitious routines score more but fail more often.</div></td></tr>' +
+        '<tr><td>Scoring focus</td><td>' + planSeg('focus', [['high', g.high.name], ['mix', 'Mixed'], ['low', g.low.name]]) + '<div class="muted">' + (canHigh ? 'Your robot can reach the ' + g.high.name + '.' : '<span class="warn">Scoring ' + p.scorer + ' is below the ' + g.high.req + ' needed for the ' + g.high.name + '. You will score low.</span>') + '</div></td></tr>' +
+        '<tr><td>Endgame</td><td>' + planSeg('end', [['early', 'Leave early'], ['normal', 'Normal'], ['late', 'Last second'], ['park', 'Just park']]) + '<div class="muted">Leaving late squeezes in more cycles but risks running out of time.</div></td></tr></table>' +
+        '<div class="row" style="margin-top:14px">' + btn('Watch match', 'watch', undefined, { cls: 'primary big' }) + btn('Quick sim', 'quick', undefined, { cls: 'big' }) + '</div>';
+    }
+    if (need.need === 'pick') {
+      const order = E.rankings(ev);
+      return '<h2>Alliance selection</h2><p>You are captain of <b>Alliance ' + need.seed + '</b>. Pick your partner for the playoffs.</p><div class="scroll"><table><tr><th>Rank</th><th>Team</th><th>Record</th><th>Avg pts</th><th></th></tr>' +
+        need.options.map((id) => { const t = E.team(ev, id), s = ev.stats[id]; return '<tr><td class="num">' + (order.indexOf(id) + 1) + '</td><td>' + tname(t) + '</td><td class="num">' + s.w + '-' + s.l + '-' + s.t + '</td><td class="num">' + E.avg(ev, id).toFixed(1) + '</td><td class="right">' + btn('Pick', 'pick', id, { cls: 'small primary' }) + '</td></tr>'; }).join('') + '</table></div>';
+    }
+    const s = ev.summary;
+    return '<h2>' + ev.name + ' complete</h2><table><tr><td>Qualification rank</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + ' (' + s.record + ')</td></tr><tr><td>Playoffs</td><td class="right"><b>' + s.result + '</b></td></tr>' +
+      '<tr><td>Awards</td><td class="right">' + (s.awards.length ? '<b>' + s.awards.join(', ') + '</b>' : 'None') + '</td></tr>' +
+      (ev.type !== 'worlds' ? '<tr><td>Advancement</td><td class="right">' + (s.advanced ? '<b class="good">Advanced!</b>' : 'Did not advance') + '</td></tr>' : '') + '</table>' +
+      '<h3 style="margin-top:14px">Event awards</h3><table>' + ev.awards.map((a) => '<tr><td>' + a.name + '</td><td>' + tname(E.team(ev, a.id)) + '</td></tr>').join('') + '</table>' +
+      '<div class="row" style="margin-top:14px">' + btn('Pack up and head home ▶', 'leave', undefined, { cls: 'primary big' }) + '</div>';
+  }
+
+  function eventScreen() {
+    const ev = G.state.event;
+    if (!ev) return '<div class="card">No event in progress.</div>';
+    const order = E.rankings(ev);
+    const ranks = order.map((id, i) => { const t = E.team(ev, id), s = ev.stats[id]; return '<tr class="' + (t.isPlayer ? 'me' : '') + '"><td class="num">' + (i + 1) + '</td><td>' + tname(t) + '</td><td class="num">' + s.w + '-' + s.l + '-' + s.t + '</td><td class="num">' + s.rp + '</td><td class="num">' + (s.n ? E.avg(ev, id).toFixed(0) : '-') + '</td></tr>'; }).join('');
+    let bracket = '';
+    if (ev.alliances) {
+      bracket = '<div class="card" style="margin-bottom:14px"><h3>Playoffs</h3>' + ev.alliances.map((a, i) => '<div class="' + (a.includes('P') ? 'good' : '') + '"><span class="muted">A' + (i + 1) + '</span> ' + nums(ev, a) + '</div>').join('') +
+        '<table style="margin-top:8px">' + ev.series.filter((s) => s.a >= 0).map((s) => '<tr><td>' + s.name + '</td><td class="num right">A' + (s.a + 1) + ' <b>' + s.wa + ' - ' + s.wb + '</b> A' + (s.b + 1) + '</td></tr>').join('') + '</table></div>';
+    }
+    return '<div class="grid"><div class="card c8"><div class="muted">' + ev.name + ' · ' + ev.teams.length + ' teams</div>' + eventMain(ev) + '</div>' +
+      '<div class="c4">' + bracket + '<div class="card" style="margin-bottom:14px"><h3>Rankings</h3><div style="max-height:380px;overflow:auto"><table><tr><th>#</th><th>Team</th><th>W-L-T</th><th>RP</th><th>Avg</th></tr>' + ranks + '</table></div></div>' +
+      (ev.feed.length ? '<div class="card"><h3>Event feed</h3><ul class="news">' + ev.feed.slice().reverse().map((f) => '<li>' + e(f) + '</li>').join('') + '</ul></div>' : '') + '</div></div>';
+  }
+
+  /* ---------- Help ---------- */
+  function help() {
+    return '<div class="card help"><h2 style="margin-top:0">How to play</h2><p>You manage a robotics team across many seasons. Each turn is one week.</p>' +
+      '<h2>The season</h2><ul><li><b>Preseason (weeks 1-2):</b> raise money, pitch sponsors, invite mentors, train students.</li><li><b>Kickoff (week ' + D.WEEKS.kickoff + '):</b> the game is revealed. Read the scoring: every game rewards different robots.</li>' +
+      '<li><b>Build and compete:</b> Qualifiers in weeks ' + D.WEEKS.q1 + ' and ' + D.WEEKS.q2 + '. Advance from either to the Regional Championship (week ' + D.WEEKS.regional + '), and from there to the World Championship (week ' + D.WEEKS.worlds + '). You keep improving the robot between events.</li></ul>' +
+      '<h2>The workshop</h2><ul><li>Each week you have a number of <b>work blocks</b>. Assign them to subsystem projects and other jobs.</li><li>Pick a <b>design concept</b> per subsystem. Simple concepts are cheap and fast but top out early. Advanced ones cost more money and work.</li>' +
+      '<li>Every upgrade costs <b>reliability</b>. Spend blocks on Test & Tune before an event or watch your robot die on the field.</li><li><b>Driver practice</b> makes cycles faster and penalties rarer.</li></ul>' +
+      '<h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
+      '<li>Playoffs are best-of-three semifinals and a final.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. A great portfolio and outreach record can carry a team with an average robot.</li>' +
+      '<li>During a live match you can make <b>coach calls</b>: push for speed at the risk of breakdowns and penalties, play it safe, or send the robot to the endgame early.</li></ul>' +
+      '<h2>The long game</h2><ul><li>Meeting your season goal brings a grant and reputation. Reputation unlocks better sponsors, mentors and recruits.</li><li>Seniors graduate. Train the younger students before you need them.</li></ul>' +
+      '<h2>Save</h2><p>The game autosaves in this browser after every action.</p><div class="row">' + btn('Delete save and return to menu', 'wipe') + '</div></div>';
+  }
+
+  /* ---------- Modals ---------- */
+  function modal() {
+    const st = G.state;
+    if (st.phase === 'review' && st.review) {
+      const r = st.review;
+      return '<div class="veil"><div class="modal"><h3>Season ' + st.season + ' review</h3>' + (r.champion ? '<div class="gamename">🏆 WORLD CHAMPIONS</div>' : '<h2>' + e(st.team.name) + '</h2>') +
+        '<table>' + (r.events.length ? r.events.map((x) => '<tr><td>' + x.name + '</td><td class="right">Rank ' + x.s.rank + '/' + x.s.of + ' · ' + x.s.result + (x.s.awards.length ? ' · ' + x.s.awards.join(', ') : '') + '</td></tr>').join('') : '<tr><td>No events played</td></tr>') + '</table>' +
+        '<p style="margin-top:12px"><b>Goal:</b> ' + r.goal + ' — ' + (r.met ? '<span class="good">met. Grant of ' + U.money(r.grant) + ', reputation +' + r.rep + '.</span>' : '<span class="bad">missed. Reputation ' + r.rep + '.</span>') + '</p>' +
+        '<p>Income ' + U.money(r.income) + ' · Spent ' + U.money(r.spent) + '</p>' +
+        '<p>' + (r.graduating.length ? 'Graduating: ' + r.graduating.map(e).join(', ') + '.' : 'Nobody graduates this year.') + '</p>' +
+        '<p class="muted">A new game means a new robot. Your students, equipment, mentors and design experience carry over.</p>' + btn('Start season ' + (st.season + 1) + ' ▶', 'nextSeason', undefined, { cls: 'primary big' }) + '</div></div>';
+    }
+    if (st.modal === 'kickoff') {
+      const g = D.game(st.game);
+      return '<div class="veil"><div class="modal"><h3>Kickoff · Season ' + st.season + '</h3><div class="gamename" style="color:' + g.color + '">' + g.name + '</div>' + gameInfo(g) +
+        '<div class="row" style="margin-top:12px">' + btn('To the workshop ▶', 'closeKickoff', undefined, { cls: 'primary big' }) + '</div></div></div>';
+    }
+    return '';
+  }
+
+  const screens = { hq, workshop, team, finance, season, event: eventScreen, help };
+
+  UI.render = function () {
+    if (!G.state) { app.innerHTML = menu(); return; }
+    if (UI.tab === 'event') { if (!G.state.event) UI.tab = 'hq'; else ensureNeed(); }
+    app.innerHTML = top() + '<main>' + screens[UI.tab]() + '</main><footer>FTC Manager v' + G.VERSION + ' · unofficial fan project, not affiliated with <i>FIRST</i></footer>' + modal();
+    if (UI.live) V.refresh();
+  };
+
+  /* ---------- actions ---------- */
+  function finishMatch(match, m) {
+    const res = M.result(m);
+    E.complete(G.state.event, match, res);
+    UI.result = { match, res, log: m.log };
+    UI.need = null; UI.live = null; UI.liveDone = false;
+  }
+  const act = {
+    diff(v) { UI.diff = v; },
+    new() {
+      const name = document.getElementById('tn').value.trim() || 'Robo Rookies';
+      const number = U.clamp(parseInt(document.getElementById('tnum').value, 10) || 12345, 1, 99999);
+      C.newGame({ name, number, difficulty: UI.diff });
+      UI.tab = 'hq';
+    },
+    continue() { if (G.load()) UI.tab = G.state.event ? 'event' : 'hq'; },
+    wipe() { if (confirm('Delete your saved career? This cannot be undone.')) { V.stop(); G.wipe(); G.state = null; Object.assign(UI, { need: null, live: null, result: null }); } },
+    tab(v) { UI.tab = v; },
+    advance() {
+      const st = G.state, free = C.blocks() - C.used();
+      if (st.phase !== 'review' && C.nextEvent() && free > 0 && !confirm(free + ' work block' + (free === 1 ? ' is' : 's are') + ' unassigned this week. Advance anyway?')) { UI.tab = 'workshop'; return; }
+      const out = C.advanceWeek();
+      if (out === 'event') UI.tab = 'event';
+      else if (out === 'kickoff') UI.tab = 'workshop';
+    },
+    alloc(v) { const [id, d] = v.split(':'); C.setAlloc(id, +d); },
+    overtime(v) { G.state.overtime = v === '1'; C.sanitizeAlloc(); },
+    upgrade(v) { if (C.startUpgrade(v) && C.used() < C.blocks()) C.setAlloc(v, 1); },
+    role(v) {
+      const [role, id] = v.split(':'), dt = G.state.driveTeam, other = role === 'driver' ? 'operator' : 'driver';
+      if (dt[other] === id) dt[other] = dt[role];
+      dt[role] = id;
+    },
+    invite(v) { C.invite(+v); },
+    dismiss(v) { C.dismiss(+v); },
+    pitch(v) { C.pitch(+v); },
+    buy(v) { C.buy(v); },
+    closeKickoff() { G.state.modal = null; UI.tab = 'workshop'; },
+    nextSeason() { C.nextSeason(); UI.tab = 'hq'; },
+    plan(v) { const [k, x] = v.split(':'); G.state.plan[k] = x; },
+    watch() {
+      const match = UI.need.match;
+      UI.live = { match, m: E.build(G.state.event, match, G.state.plan) };
+      UI.need = null; UI.liveDone = false;
+      UI.render();
+      V.start(UI.live.m, () => { UI.liveDone = true; UI.render(); });
+      return false;
+    },
+    quick() { const match = UI.need.match, m = E.build(G.state.event, match, G.state.plan); M.run(m); finishMatch(match, m); },
+    speed(v) { V.speed = +v; },
+    skip() { V.skip(); },
+    pace(v) { const p = V.player(); if (p) p.plan.pace = v; },
+    endnow() { const p = V.player(); if (p) p.endNow = true; },
+    finishLive() { V.stop(); finishMatch(UI.live.match, UI.live.m); },
+    next() { UI.result = null; },
+    pick(v) { G.state.event.playerPick = v; UI.need = null; },
+    leave() { C.finishEvent(); UI.need = null; UI.tab = 'hq'; },
+  };
+
+  document.addEventListener('click', (ev) => {
+    const el = ev.target.closest('[data-a]');
+    if (!el || el.disabled) return;
+    const fn = act[el.dataset.a];
+    if (!fn) return;
+    if (fn(el.dataset.v) === false) return;
+    G.save();
+    UI.render();
+  });
+  document.addEventListener('change', (ev) => {
+    const el = ev.target.closest('[data-c="concept"]');
+    if (!el) return;
+    const sub = G.state.robot.subs[el.dataset.v];
+    if (sub.level === 0 && !sub.active || confirm('Switch design concept? The subsystem drops to level ' + Math.floor(sub.level / 2) + ' and any project in progress is lost.')) C.setConcept(el.dataset.v, el.value);
+    G.save();
+    UI.render();
+  });
+
+  UI.render();
+})(window.FTC);
