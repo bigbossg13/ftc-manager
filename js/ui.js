@@ -19,6 +19,8 @@
 
   const gameOpt = (g) => '<option value="' + g.id + '"' + (UI.game === g.id ? ' selected' : '') + '>' + g.name + (g.year ? ' (' + C.yearLabel(g.year) + ')' : '') + '</option>';
 
+  const gameCard = (g) => '<button class="gamecard ' + (UI.game === g.id ? 'on' : '') + '" data-a="game" data-v="' + g.id + '"><canvas data-game="' + g.id + '"></canvas><b>' + g.name + '</b><span class="muted">' + (g.year ? C.yearLabel(g.year) : 'Simulated') + '</span></button>';
+
   /* ---------- menu ---------- */
   function menu() {
     return '<div class="menu"><div class="logo">FTC <span>MANAGER</span></div>' +
@@ -30,7 +32,7 @@
       '<div class="field"><label>Mode</label>' + seg('mode', UI.mode, [['career', 'Career'], ['single', 'Single season']]) +
       '<div class="muted" style="margin-top:6px">' + (UI.mode === 'career' ? D.CAREER_SEASONS + ' seasons: ' + D.REAL.map((g) => g.name).join(', ') + '.'
         : 'One season of the game you pick, graded S to D.') + '</div>' +
-      (UI.mode === 'single' ? '<select data-c="game" style="margin-top:8px"><optgroup label="FTC seasons">' + D.REAL.map(gameOpt).join('') + '</optgroup><optgroup label="Simulated games">' + D.SIM.map(gameOpt).join('') + '</optgroup></select>' : '') + '</div>' +
+      (UI.mode === 'single' ? '<h3 style="margin-top:12px">FTC seasons</h3><div class="games">' + D.REAL.map(gameCard).join('') + '</div><h3 style="margin-top:12px">Simulated games</h3><div class="games">' + D.SIM.map(gameCard).join('') + '</div>' : '') + '</div>' +
       '<div class="field"><label>Region format</label>' + seg('format', UI.format, [['qual', 'Qualifiers'], ['league', 'League meets']]) +
       '<div class="muted" style="margin-top:6px">' + (UI.format === 'league' ? 'Three league meets with carried-over standings, then a League Tournament.' : 'Two qualifying tournaments, each with playoffs and awards.') + '</div></div>' +
       '<div class="field"><label>Starting situation</label>' +
@@ -302,7 +304,11 @@
   const screens = { hq, workshop, team, finance, season, event: eventScreen, help };
 
   UI.render = function () {
-    if (!G.state) { app.innerHTML = menu(); return; }
+    if (!G.state) {
+      app.innerHTML = menu();
+      app.querySelectorAll('canvas[data-game]').forEach((cv) => V.preview(cv, D.game(cv.dataset.game)));
+      return;
+    }
     if (UI.tab === 'event') { if (!G.state.event) UI.tab = 'hq'; else ensureNeed(); }
     app.innerHTML = top() + '<main>' + screens[UI.tab]() + '</main><footer>FTC Manager v' + G.VERSION + ' · unofficial fan project, not affiliated with <i>FIRST</i></footer>' + modal();
     if (UI.live) V.refresh();
@@ -318,6 +324,7 @@
   const act = {
     diff(v) { UI.diff = v; },
     mode(v) { UI.mode = v; },
+    game(v) { UI.game = v; },
     format(v) { UI.format = v; },
     nominate(v) { C.nominate(+v); },
     perk(v) { C.buyPerk(v); },

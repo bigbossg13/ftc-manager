@@ -30,6 +30,8 @@
   }
 
   /** Redraw after the page was re-rendered around a running or finished match. */
+  /** Static field picture for a game, used on the season picker. */
+  V.preview = (canvas, game) => draw(null, 1, canvas, game);
   V.refresh = function () { V.logN = -1; if (V.m) { draw(V.m, 1); hud(V.m); } };
 
   function hud(m) {
@@ -50,12 +52,13 @@
     }
   }
 
-  function draw(m, a) {
-    const cv = $('field');
+  /** Draws the field; with no match (m null) it draws just the empty field for a game. */
+  function draw(m, a, canvas, game) {
+    const cv = canvas || $('field');
     if (!cv) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1), size = cv.clientWidth || 560;
     if (cv.width !== Math.round(size * dpr)) { cv.width = cv.height = Math.round(size * dpr); }
-    const c = cv.getContext('2d'), S = cv.width, g = D.game(m.game), L = g.layout;
+    const c = cv.getContext('2d'), S = cv.width, g = game || D.game(m.game), L = g.layout;
     const px = (v) => v * S;
     c.clearRect(0, 0, S, S);
     c.fillStyle = '#262b34'; c.fillRect(0, 0, S, S);
@@ -96,6 +99,7 @@
       c.fillText('L', px(lo[0]), px(lo[1])); c.fillText('H', px(hi[0]), px(hi[1]));
     });
 
+    if (!m) return;
     const R = px(0.038);
     m.robots.forEach((r) => {
       const x = px(r.px + (r.x - r.px) * a), y = px(r.py + (r.y - r.py) * a);
