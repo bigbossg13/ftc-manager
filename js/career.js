@@ -95,7 +95,7 @@
       const g = D.game(opts.game) || D.GAMES[0];
       st.order = [g.id];
       st.year = g.year || 2026;
-    } else st.order = D.REAL.map((g) => g.id).concat(U.shuffle(D.SIM).map((g) => g.id));
+    } else st.order = D.REAL.map((g) => g.id);
     setupSeason(st);
     C.news('Summer vendor launches are in: see Finance for this year\'s new products.');
     C.news('Team ' + st.team.number + ' ' + st.team.name + ' is founded. Kickoff is in week ' + D.WEEKS.kickoff + '.');

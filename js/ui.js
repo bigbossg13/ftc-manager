@@ -28,7 +28,7 @@
       '<div class="field"><label for="tn">Team name</label><input id="tn" type="text" maxlength="28" value="' + e(UI.name) + '"></div>' +
       '<div class="field"><label for="tnum">Team number</label><input id="tnum" type="number" min="1" max="99999" value="' + e(UI.num) + '"></div>' +
       '<div class="field"><label>Mode</label>' + seg('mode', UI.mode, [['career', 'Career'], ['single', 'Single season']]) +
-      '<div class="muted" style="margin-top:6px">' + (UI.mode === 'career' ? D.CAREER_SEASONS + ' seasons: ' + D.REAL.map((g) => g.name).join(', ') + ', then five simulated games.'
+      '<div class="muted" style="margin-top:6px">' + (UI.mode === 'career' ? D.CAREER_SEASONS + ' seasons: ' + D.REAL.map((g) => g.name).join(', ') + '.'
         : 'One season of the game you pick, graded S to D.') + '</div>' +
       (UI.mode === 'single' ? '<select data-c="game" style="margin-top:8px"><optgroup label="FTC seasons">' + D.REAL.map(gameOpt).join('') + '</optgroup><optgroup label="Simulated games">' + D.SIM.map(gameOpt).join('') + '</optgroup></select>' : '') + '</div>' +
       '<div class="field"><label>Region format</label>' + seg('format', UI.format, [['qual', 'Qualifiers'], ['league', 'League meets']]) +
@@ -289,7 +289,7 @@
         '<p>Income ' + U.money(r.income) + ' · Spent ' + U.money(r.spent) + '</p>' +
         '<p>' + (r.graduating.length ? 'Graduating: ' + r.graduating.map(e).join(', ') + '.' : 'Nobody graduates this year.') + '</p>' +
         (st.mode === 'single' ? '<div class="gamename">Grade: ' + r.grade + '</div><p class="muted">Single season complete.</p>' + btn('Back to menu', 'endSingle', undefined, { cls: 'primary big' })
-          : (st.season === D.CAREER_SEASONS ? '<p class="good">That completes the ' + D.CAREER_SEASONS + '-season career. You can keep playing with randomly drawn games.</p>' : '') +
+          : (st.season === D.CAREER_SEASONS ? '<p class="good">That completes the ' + D.CAREER_SEASONS + '-season career. You can keep playing: later seasons draw from all ten games.</p>' : '') +
             '<p class="muted">A new game means a new robot. Your students, equipment, mentors and design experience carry over.</p>' + btn('Start season ' + (st.season + 1) + ' ▶', 'nextSeason', undefined, { cls: 'primary big' })) + '</div></div>';
     }
     if (st.modal === 'kickoff') {

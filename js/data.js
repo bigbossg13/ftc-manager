@@ -198,7 +198,7 @@
     v('camera', 'Volt & Bolt', 'Smart Camera v2', 200, 'software', 'work', 0.25, 'Software upgrades take 25% less work'),
   ];
 
-  D.CAREER_SEASONS = 10;
+  D.CAREER_SEASONS = 5;
   D.DIFFICULTY = {
     easy: { name: 'Well-Funded Rookie', money: 4500, rep: 22, desc: 'A supportive school and a starter grant.' },
     normal: { name: 'Garage Team', money: 2800, rep: 15, desc: 'A kit of parts, a folding table and big plans.' },
