@@ -59,7 +59,7 @@
     const px = (v) => v * S;
     c.clearRect(0, 0, S, S);
     c.fillStyle = '#262b34'; c.fillRect(0, 0, S, S);
-    if (L.mirror !== 'y') {
+    if (!L.deco) {
       c.fillStyle = 'rgba(229,72,77,.10)'; c.fillRect(0, 0, S * 0.18, S);
       c.fillStyle = 'rgba(62,123,250,.10)'; c.fillRect(S * 0.82, 0, S * 0.18, S);
     }
