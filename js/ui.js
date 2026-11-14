@@ -44,7 +44,7 @@
   /* ---------- chrome ---------- */
   function top() {
     const st = G.state, pend = C.pending();
-    const tabs = [['hq', 'HQ'], ['inbox', 'Inbox' + (pend ? ' (' + pend + ')' : '')], ['workshop', 'Workshop'], ['team', 'Team'], ['sponsors', 'Sponsors'], ['inventory', 'Inventory'], ['shop', 'Shop'], ['season', 'Season']];
+    const tabs = [['hq', 'HQ'], ['inbox', 'Inbox' + (pend ? ' (' + pend + ')' : '')], ['build', 'Build'], ['team', 'Team'], ['sponsors', 'Sponsors'], ['inventory', 'Inventory'], ['shop', 'Shop'], ['workshop', 'Workshop'], ['season', 'Season']];
     if (st.event) tabs.push(['event', 'Event ●']);
     tabs.push(['help', 'How to play']);
     const adv = st.event ? btn('Go to event', 'tab', 'event', { cls: 'primary' })
@@ -87,7 +87,7 @@
           : 'Kickoff in <b>' + mo + '</b> month' + (mo === 1 ? '' : 's') + '. Each offseason turn is one month; once the game is revealed you plan week by week.') + '</p>' +
         (pend ? '<p class="warn">' + pend + ' decision' + (pend === 1 ? ' is' : 's are') + ' waiting in your inbox. ' + btn('Open inbox', 'tab', 'inbox', { cls: 'small' }) + '</p>' : '') +
         '<p>Team hours assigned this ' + C.turn() + ': <b>' + C.used() + ' / ' + C.hours() + ' h</b>' + (free ? ' <span class="warn">(' + free + ' h idle)</span>' : '') + '</p>' + hoursBar(false) +
-        '<div class="row" style="margin-top:12px">' + btn('Plan the ' + C.turn(), 'tab', 'workshop') + btn('Advance ' + C.turn() + ' ▶', 'advance', undefined, { cls: 'primary big' }) + '</div>';
+        '<div class="row" style="margin-top:12px">' + btn('Plan the ' + C.turn(), 'tab', 'build') + btn('Advance ' + C.turn() + ' ▶', 'advance', undefined, { cls: 'primary big' }) + '</div>';
     } else up = '<h2>Season complete</h2><p class="muted">No more events for the team this season.</p>' + btn('Go to season review ▶', 'advance', undefined, { cls: 'primary big' });
     return '<div class="grid"><div class="card c8 hl">' + up + '</div>' +
       '<div class="card c4"><h3>Season goal</h3><p>' + goal.text + '</p><p class="muted">Meet it for a ' + U.money(goal.grant) + ' grant and a reputation boost. Goals get harder as your reputation grows.</p>' +
@@ -114,7 +114,7 @@
       (legend ? '<div class="hlegend">' + ids.map((id) => '<span><i style="background:' + ACT_COLORS[id] + '"></i>' + actName(id) + ' ' + st.alloc[id] + ' h</span>').join('') + (free > 0 ? '<span><i class="free"></i>Idle ' + free + ' h</span>' : '') + '</div>' : '');
   }
   const projHours = (id) => { const std = C.baseHours(id), mine = C.levelWork(id); return mine < std ? mine + ' h (standard ' + std + ' h)' : std + ' h project'; };
-  function workshop() {
+  function build() {
     const st = G.state;
     const effRow = [['mech', 'Mechanical', 'drive'], ['soft', 'Software', 'software'], ['drive', 'Driving', 'practice'], ['biz', 'Business', 'outreach']].map((x) => '<span class="tag">' + x[1] + ' ×' + C.eff(x[2]).toFixed(2) + '</span>').join(' ');
     const subs = D.SUBS.map((s) => {
@@ -184,29 +184,47 @@
     const st = G.state, planned = {};
     D.SUBS.forEach((s) => { const r = st.robot.subs[s.id]; if (!r.active && r.level < C.concept(s.id).max) { const need = C.recipe(s.id); Object.keys(need).forEach((id) => { planned[id] = (planned[id] || 0) + need[id]; }); } });
     const rows = D.PARTS.map((p) => { const have = st.inventory[p.id] || 0, need = planned[p.id] || 0;
-      return '<tr><td><b>' + p.name + '</b>' + (p.desc ? '<div class="muted">' + p.desc + '</div>' : '') + '</td><td class="num right"><b>' + have + '</b></td><td class="num right">' + (st.robot.used[p.id] || 0) + '</td><td class="num right ' + (need > have ? 'warn' : '') + '">' + need + '</td><td class="num right">' + U.money(C.partPrice(p.id)) + '</td></tr>'; }).join('');
+      return '<tr><td><b>' + p.name + '</b>' + (p.desc ? '<div class="muted">' + p.desc + '</div>' : '') + '</td><td class="num right"><b>' + have + '</b></td><td class="num right">' + (st.robot.used[p.id] || 0) + '</td><td class="num right ' + (need > have ? 'warn' : '') + '">' + need + '</td><td class="num right">' + U.money(C.partPrice(p.id)) + '</td><td class="num right">' + (C.stock(p.id) || '<span class="tag s">Sold out</span>') + '</td></tr>'; }).join('');
     const value = D.PARTS.reduce((a, p) => a + (st.inventory[p.id] || 0) * p.price, 0);
-    return '<div class="grid"><div class="card c8"><h3>Parts inventory</h3><div class="scroll"><table><tr><th>Part</th><th class="right">In stock</th><th class="right">On the robot</th><th class="right">Next upgrades need</th><th class="right">Shop price</th></tr>' + rows + '</table></div>' +
+    return '<div class="grid"><div class="card c8"><h3>Parts inventory</h3><div class="scroll"><table><tr><th>Part</th><th class="right">In stock</th><th class="right">On the robot</th><th class="right">Next upgrades need</th><th class="right">Shop price</th><th class="right">At vendors</th></tr>' + rows + '</table></div>' +
       '<p class="muted" style="margin-top:8px">"Next upgrades need" adds up the next level of every subsystem you have not started yet. Stock worth ' + U.money(value) + ' at list price.</p>' +
       '<div class="row">' + btn('Go to the shop', 'tab', 'shop') + '</div></div>' +
-      '<div class="card c4"><h3>How parts work</h3><p class="muted">Starting an upgrade takes its parts from here and buys whatever is missing at the current shop price.</p><p class="muted">Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more during the season, so buying ahead in the offseason saves money.</p><p class="muted">At the end of the season half of the parts on the robot are salvaged back into stock. Unused parts stay with the team.</p></div></div>';
+      '<div class="card c4"><h3>How parts work</h3><p class="muted">Starting an upgrade takes its parts from here and buys whatever is missing at the current shop price.</p><p class="muted">Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more during the season and can sell out, so buying ahead in the offseason saves money and delays.</p><p class="muted">At the end of the season half of the parts on the robot are salvaged back into stock. Unused parts stay with the team.</p></div></div>';
   }
 
   /* ---------- Shop ---------- */
   function shop() {
     const st = G.state;
     const parts = D.PARTS.map((p) => { const price = C.partPrice(p.id);
-      return '<tr><td><b>' + p.name + '</b>' + (p.desc ? '<div class="muted">' + p.desc + '</div>' : '') + '</td><td class="num right">' + U.money(price) + '</td><td class="num right">' + (st.inventory[p.id] || 0) + '</td><td class="right"><span class="seg">' +
-        [1, 5, 10].map((n) => btn('+' + n, 'part', p.id + ':' + n, { off: st.team.money < price * n, title: 'Buy ' + n + ' for ' + U.money(price * n) })).join('') + '</span></td></tr>'; }).join('');
+      const left = C.stock(p.id);
+      return '<tr><td><b>' + p.name + '</b>' + (p.desc ? '<div class="muted">' + p.desc + '</div>' : '') + '</td><td class="num right">' + U.money(price) + '</td><td class="num right">' + (left ? left : '<span class="tag s">Sold out</span>') + '</td><td class="num right">' + (st.inventory[p.id] || 0) + '</td><td class="right"><span class="seg">' +
+        [1, 5, 10].map((n) => btn('+' + n, 'part', p.id + ':' + n, { off: st.team.money < price * n || left < n, title: left < n ? 'Only ' + left + ' left at the vendors' : 'Buy ' + n + ' for ' + U.money(price * n) })).join('') + '</span></td></tr>'; }).join('');
     const vend = C.vendorOpen() ? '<div class="scroll"><table>' + st.vendor.map((id) => { const x = D.VENDOR.find((p) => p.id === id); return '<tr><td><b>' + x.name + '</b> <span class="muted">' + x.vendor + '</span><div class="muted">' + x.desc + '</div></td><td class="right">' +
         (st.perks[id] ? '<span class="tag a">In use</span>' : btn(U.money(x.cost), 'perk', id, { off: st.team.money < x.cost, cls: 'small' })) + '</td></tr>'; }).join('') + '</table></div><p class="muted" style="margin-top:8px">Good for this season only: next year\'s game needs next year\'s products.</p>'
       : '<p class="muted">Vendors announce this year\'s products in ' + D.MONTHS[D.VENDOR_MONTH] + '.</p>';
+    return '<div class="grid"><div class="card c7"><div class="row spread"><h3>Parts</h3><span class="tag ' + (C.inPre() ? 'a' : '') + '">' + (C.inPre() ? 'Offseason: list price' : 'In season: +' + Math.round(D.IN_SEASON_MARKUP * 100) + '% rush shipping') + '</span></div>' +
+      '<div class="scroll"><table><tr><th>Part</th><th class="right">Price</th><th class="right">At vendors</th><th class="right">You have</th><th class="right">Buy</th></tr>' + parts + '</table></div>' +
+      '<p class="muted" style="margin-top:8px">' + (C.inPre() ? 'Shelves are full all offseason. Once the game is revealed every team orders at once: stock halves at kickoff and parts can sell out for a week at a time.' : 'Each week a part either sells out or is partly restocked. Sell-outs are most common in the first ' + D.SELLOUT.rushWeeks + ' weeks after kickoff.') + '</p></div>' +
+      '<div class="card c5"><h3>New from vendors</h3>' + vend + '</div></div>';
+  }
+
+  /* ---------- Workshop: space and equipment ---------- */
+  function workshop() {
+    const st = G.state, pct = (v) => (v ? '<b class="good">+' + Math.round(v * 100) + '%</b>' : '<span class="muted">none</span>');
     const fac = D.FACILITIES.map((f) => '<tr><td><b>' + f.name + '</b><div class="muted">' + f.desc + '</div></td><td class="right">' +
       (st.facilities[f.id] ? '<span class="tag a">Owned</span>' : btn(U.money(f.cost), 'buy', f.id, { off: st.team.money < f.cost, cls: 'small' })) + '</td></tr>').join('');
-    return '<div class="grid"><div class="card c7"><div class="row spread"><h3>Parts</h3><span class="tag ' + (C.inPre() ? 'a' : '') + '">' + (C.inPre() ? 'Offseason: list price' : 'In season: +' + Math.round(D.IN_SEASON_MARKUP * 100) + '% rush shipping') + '</span></div>' +
-      '<div class="scroll"><table><tr><th>Part</th><th class="right">Price</th><th class="right">In stock</th><th class="right">Buy</th></tr>' + parts + '</table></div></div>' +
-      '<div class="card c5"><h3>New from vendors</h3>' + vend + '</div>' +
-      '<div class="card c12"><h3>Workshop & equipment</h3><div class="scroll"><table>' + fac + '</table></div></div></div>';
+    const owned = D.FACILITIES.filter((f) => st.facilities[f.id]).length;
+    return '<div class="grid"><div class="card c7"><h3>Equipment (' + owned + ' of ' + D.FACILITIES.length + ' owned)</h3><div class="scroll"><table>' + fac + '</table></div>' +
+      '<p class="muted" style="margin-top:8px">Equipment is bought once and stays with the team for good.</p></div>' +
+      '<div class="card c5"><h3>What your workshop gives you</h3><table>' +
+      '<tr><td>Team hours</td><td class="right"><b>' + C.hours() + ' h</b> this ' + C.turn() + '</td></tr>' +
+      '<tr><td>Mentor slots</td><td class="right"><b>' + C.mentorSlots() + '</b></td></tr>' +
+      '<tr><td>Building</td><td class="right">' + pct(C.facBonus('drive')) + '</td></tr>' +
+      '<tr><td>Software</td><td class="right">' + pct(C.facBonus('software')) + '</td></tr>' +
+      '<tr><td>Testing and driver practice</td><td class="right">' + pct(C.facBonus('test')) + '</td></tr>' +
+      '<tr><td>Portfolio</td><td class="right">' + pct(C.facBonus('portfolio')) + '</td></tr>' +
+      '<tr><td>Outreach and fundraising</td><td class="right">' + pct(C.facBonus('outreach')) + '</td></tr></table>' +
+      '<p class="muted" style="margin-top:8px">These bonuses are already included in the efficiency figures on the Build page.</p></div></div>';
   }
 
   /* ---------- Inbox ---------- */
@@ -326,9 +344,9 @@
     return '<div class="card help"><h2 style="margin-top:0">How to play</h2><p>You manage a robotics team across many seasons. Each turn is one week.</p>' +
       '<h2>The season</h2><ul><li><b>Offseason (' + D.MONTHS[0] + ' to ' + D.MONTHS[D.MONTHS.length - 1] + '):</b> one turn is a month. Raise money, pitch sponsors, bring on mentors, train students and buy parts at list price. Vendors launch new products in ' + D.MONTHS[D.VENDOR_MONTH] + '.</li><li><b>Kickoff (September):</b> the game is revealed and turns become weekly. Read the scoring: every game rewards different robots.</li>' +
       '<li><b>Build and compete:</b> Qualifiers in weeks ' + D.WEEKS.q1 + ' and ' + D.WEEKS.q2 + ' (or, in a league region, three meets and a League Tournament). Advance from either to the Regional Championship (week ' + D.WEEKS.regional + '), and from there to the World Championship (week ' + D.WEEKS.worlds + '). You keep improving the robot between events.</li></ul>' +
-      '<h2>The workshop</h2><ul><li>Each week the team has a pool of <b>hours</b>, shown as one bar. Split them between subsystem projects and other jobs by typing hours in.</li><li>Every project has a <b>standard number of hours</b>. Your efficiency in that discipline (skills, mentors, equipment, morale) decides how much of it one of your hours gets done.</li><li>Pick a <b>design concept</b> per subsystem. Simple concepts are cheap and fast but top out early. Advanced ones cost more money and work.</li>' +
+      '<h2>Building the robot</h2><ul><li>Each week the team has a pool of <b>hours</b>, shown as one bar. Split them between subsystem projects and other jobs by typing hours in.</li><li>Every project has a <b>standard number of hours</b>. Your efficiency in that discipline (skills, mentors, equipment, morale) decides how much of it one of your hours gets done.</li><li>Pick a <b>design concept</b> per subsystem. Simple concepts are cheap and fast but top out early. Advanced ones cost more money and work.</li>' +
       '<li>Every upgrade costs <b>reliability</b>. Spend hours on Test & Tune before an event or watch your robot die on the field.</li><li><b>Driver practice</b> makes cycles faster and penalties rarer.</li></ul>' +
-      '<h2>Parts and the inbox</h2><ul><li>Every upgrade is built from <b>parts</b>. Starting an upgrade uses what is in your inventory and buys the rest. Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more once the season starts, so stock up over the summer.</li><li>Leftover parts carry over, and half of the parts on last year\'s robot are salvaged.</li><li>The <b>inbox</b> brings decisions: sponsor requests, breakdowns, student issues. You must answer them before the calendar moves on.</li></ul><h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
+      '<h2>Parts and the inbox</h2><ul><li>Every upgrade is built from <b>parts</b>. Starting an upgrade uses what is in your inventory and buys the rest. Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more once the season starts, and vendors can <b>sell out</b> of a part for a week, most often right after kickoff. Stock up over the summer.</li><li>Leftover parts carry over, and half of the parts on last year\'s robot are salvaged.</li><li>The <b>inbox</b> brings decisions: sponsor requests, breakdowns, student issues. You must answer them before the calendar moves on.</li></ul><h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
       '<li>Playoffs are best-of-three semifinals and a final.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. Nominate a mentor on the Team screen for the Compass Award. A great portfolio and outreach record can carry a team with an average robot.</li>' +
       '<li>During a live match you can make <b>coach calls</b>: push for speed at the risk of breakdowns and penalties, play it safe, or send the robot to the endgame early.</li></ul>' +
       '<h2>The long game</h2><ul><li>Meeting your season goal brings a grant and reputation. Reputation unlocks better sponsors, mentors and recruits.</li><li>Seniors graduate. Train the younger students before you need them.</li></ul>' +
@@ -352,12 +370,12 @@
     if (st.modal === 'kickoff') {
       const g = D.game(st.game);
       return '<div class="veil"><div class="modal"><h3>Kickoff · Season ' + st.season + '</h3><div class="gamename" style="color:' + g.color + '">' + g.name + '</div>' + gameInfo(g) +
-        '<div class="row" style="margin-top:12px">' + btn('To the workshop ▶', 'closeKickoff', undefined, { cls: 'primary big' }) + '</div></div></div>';
+        '<div class="row" style="margin-top:12px">' + btn('Plan the build ▶', 'closeKickoff', undefined, { cls: 'primary big' }) + '</div></div></div>';
     }
     return '';
   }
 
-  const screens = { hq, inbox, workshop, team, sponsors, inventory, shop, season, event: eventScreen, help };
+  const screens = { hq, inbox, build, workshop, team, sponsors, inventory, shop, season, event: eventScreen, help };
 
   UI.render = function () {
     if (!G.state) {
@@ -396,12 +414,12 @@
     tab(v) { UI.tab = v; },
     advance() {
       const st = G.state, free = C.hours() - C.used();
-      if (st.phase !== 'review' && C.nextEvent() && free > 0 && !confirm(free + ' team hour' + (free === 1 ? ' is' : 's are') + ' unassigned this ' + C.turn() + '. Advance anyway?')) { UI.tab = 'workshop'; return; }
+      if (st.phase !== 'review' && C.nextEvent() && free > 0 && !confirm(free + ' team hour' + (free === 1 ? ' is' : 's are') + ' unassigned this ' + C.turn() + '. Advance anyway?')) { UI.tab = 'build'; return; }
       if (C.pending()) { UI.tab = 'inbox'; return; }
       const out = C.advanceWeek();
       if (out === 'event') UI.tab = 'event';
       else if (C.pending()) UI.tab = 'inbox';
-      else if (out === 'kickoff') UI.tab = 'workshop';
+      else if (out === 'kickoff') UI.tab = 'build';
     },
     alloc(v) { const [id, d] = v.split(':'); C.setAlloc(id, +d); },
     overtime(v) { G.state.overtime = v === '1'; C.sanitizeAlloc(); },
@@ -410,7 +428,7 @@
     dismiss(v) { C.dismiss(+v); },
     pitch(v) { C.pitch(+v); },
     buy(v) { C.buy(v); },
-    closeKickoff() { G.state.modal = null; UI.tab = 'workshop'; },
+    closeKickoff() { G.state.modal = null; UI.tab = 'build'; },
     nextSeason() { C.nextSeason(); UI.tab = 'hq'; },
     plan(v) { const [k, x] = v.split(':'); G.state.plan[k] = x; },
     watch() {

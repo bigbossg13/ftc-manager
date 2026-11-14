@@ -61,6 +61,7 @@
     st.perks = {};
     st.league = st.format === 'league' ? { ids: U.shuffle(st.world.teams).slice(0, 15).map((t) => t.id), stats: null } : null;
     st.period = 'pre'; st.month = 0; st.week = 0; st.hoursMod = 0;
+    st.stock = Object.assign({}, D.STOCK_MAX);
     C.autoDriveTeam();
     const goal = D.GOALS[st.goal];
     C.mail('School board', 'Season goal', 'This year the board expects the team to: ' + goal.text.charAt(0).toLowerCase() + goal.text.slice(1) + '. Meeting it earns a ' + U.money(goal.grant) + ' grant.');
@@ -89,7 +90,7 @@
       banners: [], compass: null, vendor: [], perks: {}, league: null,
       team: { name: opts.name || 'Robo Rookies', number: opts.number || 31415, rep: diff.rep, money: diff.money },
       season: 1, year: 2022, week: 0, month: 0, period: 'pre', hoursMod: 0, phase: 'play', game: null, kickoff: false,
-      inventory: {}, inbox: [], recent: [],
+      inventory: {}, stock: {}, inbox: [], recent: [],
       students: [], mentors: [], mentorPool: [], facilities: {}, sponsors: [], offers: [],
       robot: freshRobot(), knowledge: {}, practice: 0, morale: 75, overtime: false, alloc: {},
       awards: { portfolio: 0, outreach: 0 }, driveTeam: {}, plan: { auto: 'std', focus: 'high', end: 'normal' },
@@ -141,10 +142,26 @@
   };
   /** Cash needed to start the next level: only the parts not already in inventory. */
   C.levelCost = function (subId) { const m = C.missing(subId); return Object.keys(m).reduce((a, id) => a + m[id] * C.partPrice(id), 0); };
+  /** How many of a part the shop has on the shelf right now. */
+  C.stock = (id) => { const st = G.state; if (!st.stock) st.stock = Object.assign({}, D.STOCK_MAX); return st.stock[id] || 0; };
+  /** Parts an upgrade is short of that the shop cannot supply this turn. */
+  C.soldOut = function (subId) { const m = C.missing(subId); return Object.keys(m).filter((id) => m[id] > C.stock(id)); };
+  /** Weekly shelf changes: each part either sells out or is partly restocked. */
+  function restock() {
+    const st = G.state, gone = [];
+    if (C.inPre()) { st.stock = Object.assign({}, D.STOCK_MAX); return; }
+    const p = st.week <= D.SELLOUT.rushWeeks ? D.SELLOUT.rush : D.SELLOUT.normal;
+    D.PARTS.forEach((part) => {
+      const max = D.STOCK_MAX[part.id];
+      if (G.rand() < p) { st.stock[part.id] = 0; gone.push(part.name); }
+      else st.stock[part.id] = Math.min(max, C.stock(part.id) + Math.ceil(max * D.RESTOCK));
+    });
+    if (gone.length) C.news('Sold out at the vendors this week: ' + gone.join(', ') + '.');
+  }
   C.buyPart = function (id, qty) {
     const st = G.state, cost = C.partPrice(id) * qty;
-    if (qty <= 0 || st.team.money < cost) return false;
-    C.pay(cost); st.inventory[id] = (st.inventory[id] || 0) + qty;
+    if (qty <= 0 || st.team.money < cost || C.stock(id) < qty) return false;
+    C.pay(cost); st.inventory[id] = (st.inventory[id] || 0) + qty; st.stock[id] -= qty;
     return true;
   };
   /** Standard hours for the next level of a concept: the same for every team, in steps of 5. */
@@ -163,6 +180,8 @@
     if (!st.kickoff) return 'Wait for kickoff';
     if (s.active) return 'In progress';
     if (s.level >= C.concept(subId).max) return 'Maxed out';
+    const out = C.soldOut(subId);
+    if (out.length) return 'Sold out: ' + out.map((id) => D.part(id).name).join(', ');
     if (st.team.money < C.levelCost(subId)) return 'Not enough money';
     return '';
   };
@@ -249,12 +268,13 @@
     software: { sensors: 0.2, laptops: 0.1 }, test: { field: 0.3 }, practice: { field: 0.3 }, portfolio: { laptops: 0.1 },
     outreach: { pit: 0.15 }, fundraise: { pit: 0.15 }, training: {},
   };
+  /** Equipment bonus for a job, as a fraction (0.25 = +25%). */
+  C.facBonus = (id) => Object.keys(FAC[id]).reduce((a, f) => a + (G.state.facilities[f] ? FAC[id][f] : 0), 0);
   C.actSkill = (id) => (D.sub(id) ? D.sub(id).skill : D.ACTS.find((a) => a.id === id).skill);
   /** Efficiency: how much progress one assigned hour makes (1.0 = one standard hour). */
   C.eff = function (id) {
     const st = G.state, k = C.actSkill(id);
-    let fac = 0;
-    Object.keys(FAC[id]).forEach((f) => { if (st.facilities[f]) fac += FAC[id][f]; });
+    const fac = C.facBonus(id);
     const skill = k ? C.skillAvg(k) : 50;
     return (0.5 + skill / 100) * (1 + (k ? C.mentorBonus(k) : 0)) * (1 + fac) * (0.7 + 0.3 * st.morale / 100);
   };
@@ -339,6 +359,8 @@
       if (st.month === D.VENDOR_MONTH) C.mail('Vendors', 'Summer product launches', 'This year\'s new products are in the Shop: ' + st.vendor.map((id) => D.VENDOR.find((x) => x.id === id).name).join(', ') + '. Parts are also at list price until kickoff.');
       if (st.month >= D.MONTHS.length) {
         st.period = 'season'; st.week = 1; st.kickoff = true;
+        // Kickoff rush: every team orders at once.
+        D.PARTS.forEach((part) => { st.stock[part.id] = Math.floor(D.STOCK_MAX[part.id] / 2); });
         C.pay(300);
         C.news('KICKOFF! This season\'s game is ' + D.game(st.game).name + '. Season registration: $300.');
         st.modal = 'kickoff';
@@ -352,8 +374,10 @@
       if (!next) { C.makeReview(); return 'review'; }
       st.week++;
       out = 'week';
+      restock();
       if (st.week === next.week) { startEvent(next); out = 'event'; }
     }
+    if (out === 'month') restock();
     rollInbox();
     C.sanitizeAlloc();
     return out;

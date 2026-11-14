@@ -64,6 +64,7 @@ tr.me td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .step b { min-width: 20px; text-align: center; font-variant-numeric: tabular-nums; }
 .step button { width: 30px; height: 30px; padding: 0; font-weight: 700; }
 .tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); }
+.tag.s { color: var(--bad); border-color: var(--bad); }
 .tag.a { color: var(--accent2); border-color: var(--accent); }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .seg button { border: 0; border-radius: 0; background: var(--panel2); padding: 6px 11px; font-size: 13px; }

@@ -289,6 +289,11 @@
   ];
   D.part = (id) => D.PARTS.find((p) => p.id === id);
   D.IN_SEASON_MARKUP = 0.25; // rush shipping once the season is on
+  /* Shop stock. Shelves are full all offseason, halve in the kickoff rush, then
+     refill by RESTOCK of the maximum each week unless that part sells out. */
+  D.STOCK_MAX = { motor: 24, servo: 20, structure: 36, wheels: 10, sensor: 14, hardware: 48 };
+  D.RESTOCK = 0.4;
+  D.SELLOUT = { rush: 0.3, rushWeeks: 4, normal: 0.12 };
   D.SALVAGE = 0.5;
   D.STARTER_PARTS = { motor: 2, servo: 2, structure: 6, wheels: 1, sensor: 0, hardware: 10 };
   /* Parts for one level of each concept. Levels 4-6 need double, 7-9 triple, 10 four times. */
