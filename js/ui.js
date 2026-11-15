@@ -341,28 +341,30 @@
     }
     const need = UI.need;
     if (!need) return '';
+    const note = UI.note ? '<p class="tag a" style="display:block;padding:8px 12px;margin-bottom:12px">' + e(UI.note) + '</p>' : '';
     if (need.need === 'match') {
       const m = need.match, side = m.red.includes('P') ? 0 : 1, p = C.playerPerf();
       const canHigh = p.scorer >= g.high.req;
-      return '<h2>' + m.label + '</h2><p class="muted">You are on the <b class="' + (side ? 'bluec' : 'redc') + '">' + (side ? 'blue' : 'red') + '</b> alliance. Set the match plan, then watch or simulate.</p>' +
+      return note + '<h2>' + m.label + '</h2><p class="muted">You are on the <b class="' + (side ? 'bluec' : 'redc') + '">' + (side ? 'blue' : 'red') + '</b> alliance. Set the match plan, then watch or simulate.</p>' +
         '<div class="vs">' + allianceCard(ev, m.red, 0) + allianceCard(ev, m.blue, 1) + '</div>' +
         '<h3 style="margin-top:14px">Match plan</h3><table>' +
         '<tr><td>Autonomous</td><td>' + planSeg('auto', [['safe', 'Safe'], ['std', 'Standard'], ['bold', 'Ambitious']]) + '<div class="muted">Ambitious routines score more but fail more often.</div></td></tr>' +
         '<tr><td>Scoring focus</td><td>' + planSeg('focus', [['high', g.high.name], ['mix', 'Mixed'], ['low', g.low.name]]) + '<div class="muted">' + (canHigh ? 'Your robot can reach the ' + g.high.name + '.' : '<span class="warn">Scoring ' + p.scorer + ' is below the ' + g.high.req + ' needed for the ' + g.high.name + '. You will score low.</span>') + '</div></td></tr>' +
         '<tr><td>Endgame</td><td>' + planSeg('end', [['early', 'Leave early'], ['normal', 'Normal'], ['late', 'Last second'], ['park', 'Just park']]) + '<div class="muted">Leaving late squeezes in more cycles but risks running out of time.</div></td></tr></table>' +
-        '<div class="row" style="margin-top:14px">' + btn('Watch match', 'watch', undefined, { cls: 'primary big' }) + btn('Quick sim', 'quick', undefined, { cls: 'big' }) + '</div>';
+        '<div class="row" style="margin-top:14px">' + btn('Watch match', 'watch', undefined, { cls: 'primary big' }) + btn('Quick sim', 'quick', undefined, { cls: 'big' }) +
+        (m.kind === 'qual' ? btn(ev.type === 'meet' ? 'Sim the rest of the meet' : 'Sim to alliance selection', 'simQuals', undefined, { cls: 'big', title: 'Simulate every remaining qualification match with this match plan' }) : '') + '</div>';
     }
     if (need.need === 'pick') {
       const order = E.rankings(ev);
-      return '<h2>Alliance selection</h2><p>You are captain of <b>Alliance ' + need.seed + '</b>. Pick your partner for the playoffs.</p><div class="scroll"><table><tr><th>Rank</th><th>Team</th><th>Record</th><th>Avg pts</th><th></th></tr>' +
+      return note + '<h2>Alliance selection</h2><p>You are captain of <b>Alliance ' + need.seed + '</b>. Pick your partner for the playoffs.</p><div class="scroll"><table><tr><th>Rank</th><th>Team</th><th>Record</th><th>Avg pts</th><th></th></tr>' +
         need.options.map((id) => { const t = E.team(ev, id), s = ev.stats[id]; return '<tr><td class="num">' + (order.indexOf(id) + 1) + '</td><td>' + tname(t) + '</td><td class="num">' + s.w + '-' + s.l + '-' + s.t + '</td><td class="num">' + E.avg(ev, id).toFixed(1) + '</td><td class="right">' + btn('Pick', 'pick', id, { cls: 'small primary' }) + '</td></tr>'; }).join('') + '</table></div>';
     }
     const s = ev.summary;
-    if (ev.type === 'meet') return '<h2>' + ev.name + ' complete</h2><table><tr><td>Record at this meet</td><td class="right"><b>' + s.record + '</b></td></tr><tr><td>League standing</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + '</td></tr></table>' +
+    if (ev.type === 'meet') return note + '<h2>' + ev.name + ' complete</h2><table><tr><td>Record at this meet</td><td class="right"><b>' + s.record + '</b></td></tr><tr><td>League standing</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + '</td></tr></table>' +
       '<p class="muted" style="margin-top:10px">League meets have no playoffs or awards. Your standing carries into the League Tournament.</p><div class="row" style="margin-top:14px">' + btn('Pack up and head home ▶', 'leave', undefined, { cls: 'primary big' }) + '</div>';
-    if (ev.type === 'offseason') return '<h2>' + ev.name + ' complete</h2><table><tr><td>Qualification rank</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + ' (' + s.record + ')</td></tr><tr><td>Playoffs</td><td class="right"><b>' + s.result + '</b></td></tr></table>' +
+    if (ev.type === 'offseason') return note + '<h2>' + ev.name + ' complete</h2><table><tr><td>Qualification rank</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + ' (' + s.record + ')</td></tr><tr><td>Playoffs</td><td class="right"><b>' + s.result + '</b></td></tr></table>' +
       '<p class="muted" style="margin-top:10px">Offseason events have no judged awards and nothing rides on them, but the drive team gains practice and experience.</p><div class="row" style="margin-top:14px">' + btn('Pack up and head home ▶', 'leave', undefined, { cls: 'primary big' }) + '</div>';
-    return '<h2>' + ev.name + ' complete</h2><table><tr><td>Qualification rank</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + ' (' + s.record + ')</td></tr><tr><td>Playoffs</td><td class="right"><b>' + s.result + '</b></td></tr>' +
+    return note + '<h2>' + ev.name + ' complete</h2><table><tr><td>Qualification rank</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + ' (' + s.record + ')</td></tr><tr><td>Playoffs</td><td class="right"><b>' + s.result + '</b></td></tr>' +
       '<tr><td>Awards</td><td class="right">' + (s.awards.length ? '<b>' + s.awards.join(', ') + '</b>' : 'None') + '</td></tr>' +
       (ev.type !== 'worlds' ? '<tr><td>Advancement</td><td class="right">' + (s.advanced ? '<b class="good">Advanced!</b>' : 'Did not advance') + '</td></tr>' : '') + '</table>' +
       '<h3 style="margin-top:14px">Event awards</h3><table>' + ev.awards.map((a) => '<tr><td>' + a.name + '</td><td>' + tname(E.team(ev, a.id)) + '</td></tr>').join('') + '</table>' +
@@ -392,7 +394,7 @@
       '<h2>Building the robot</h2><ul><li>Each week the team has a pool of <b>hours</b>, shown as one bar. Split them between subsystem projects and other jobs by typing hours in.</li><li>Every project has a <b>standard number of hours</b>. Your efficiency in that discipline (skills, mentors, equipment, morale) decides how much of it one of your hours gets done.</li><li>Pick a <b>design concept</b> per subsystem. Simple concepts are cheap and fast but top out early. Advanced ones cost more money and work.</li>' +
       '<li>Every upgrade costs <b>reliability</b>. Spend hours on Test & Tune before an event or watch your robot die on the field.</li><li><b>Driver practice</b> makes cycles faster and penalties rarer.</li></ul>' +
       '<h2>Parts and the inbox</h2><ul><li>Every upgrade is built from <b>parts</b>. Starting an upgrade uses what is in your inventory and buys the rest. Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more once the season starts, and vendors can <b>sell out</b> of a part for a week, most often right after kickoff. Stock up over the summer.</li><li>The <b>skill tree</b> on the Skills page is studied with team hours, in or out of season, and you can split hours across several skills at once. Skills are permanent: some make work go further, and the advanced design concepts cannot be built without theirs.</li><li><b>Offseason events</b> on the Season page are optional summer tournaments played with last season\'s robot. Sign up before the month they are held. The <b>drivetrain</b> is the one subsystem you can start building before kickoff.</li><li><b>Field kits</b> are this season\'s game elements to practise on. Preorder one in the Shop before kickoff; afterwards they cost ' + Math.round(D.FIELD_MARKUP * 100) + '% more and take ' + D.FIELD_DELAY + ' weeks to arrive.</li><li>Leftover parts carry over, and half of the parts on last year\'s robot are salvaged.</li><li>The <b>inbox</b> brings decisions: sponsor requests, breakdowns, student issues. You must answer them before the calendar moves on.</li></ul><h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
-      '<li>Playoffs are best-of-three semifinals and a final.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. Nominate a mentor on the Team screen for the Compass Award. A great portfolio and outreach record can carry a team with an average robot.</li>' +
+      '<li>Playoffs are best-of-three semifinals and a final.</li><li>You can watch a match, quick-sim it, or simulate every remaining qualification match at once and pick the event up at alliance selection.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. Nominate a mentor on the Team screen for the Compass Award. A great portfolio and outreach record can carry a team with an average robot.</li>' +
       '<li>During a live match you can make <b>coach calls</b>: push for speed at the risk of breakdowns and penalties, play it safe, or send the robot to the endgame early.</li></ul>' +
       '<h2>The long game</h2><ul><li>Meeting your season goal brings a grant and reputation. Reputation unlocks better sponsors, mentors and recruits.</li><li>Seniors graduate. Train the younger students before you need them.</li></ul>' +
       '<h2>Save</h2><p>The game autosaves in this browser after every action.</p><div class="row">' + btn('Delete save and return to menu', 'wipe') + '</div></div>';
@@ -486,6 +488,20 @@
       V.start(UI.live.m, () => { UI.liveDone = true; UI.render(); });
       return false;
     },
+    simQuals() {
+      const ev = G.state.event;
+      let need = UI.need, played = 0;
+      while (need && need.need === 'match' && need.match.kind === 'qual') {
+        const m = E.build(ev, need.match, G.state.plan);
+        M.run(m);
+        E.complete(ev, need.match, M.result(m));
+        played++;
+        need = E.advance(ev);
+      }
+      const s = ev.stats.P;
+      UI.need = need; UI.result = null;
+      UI.note = played + ' qualification match' + (played === 1 ? '' : 'es') + ' simulated. You are ' + s.w + '-' + s.l + '-' + s.t + ', ranked ' + (E.rankings(ev).indexOf('P') + 1) + ' of ' + ev.teams.length + '.';
+    },
     quick() { const match = UI.need.match, m = E.build(G.state.event, match, G.state.plan); M.run(m); finishMatch(match, m); },
     speed(v) { V.speed = +v; },
     skip() { V.skip(); },
@@ -502,6 +518,7 @@
     if (!el || el.disabled) return;
     const fn = act[el.dataset.a];
     if (!fn) return;
+    if (['watch', 'quick', 'pick', 'leave', 'next'].includes(el.dataset.a)) UI.note = null;
     if (!G.state && document.getElementById('tn')) { UI.name = document.getElementById('tn').value; UI.num = document.getElementById('tnum').value; }
     if (fn(el.dataset.v) === false) return;
     G.save();
