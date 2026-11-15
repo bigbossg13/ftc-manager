@@ -418,7 +418,14 @@
     if (st.event || st.phase === 'review') return 'blocked';
     if (C.pending()) return 'inbox';
     applyWork();
-    st.alloc = {}; // every turn is planned from scratch
+    // Multi-turn projects keep their hours; one-off jobs are planned afresh each turn.
+    const carried = {};
+    Object.keys(st.alloc).forEach((id) => {
+      const sub = st.robot.subs[id], skill = C.skillOf(id);
+      if (st.alloc[id] > 0 && ((sub && sub.active) || (skill && !C.has(skill.id)))) carried[id] = st.alloc[id];
+    });
+    st.alloc = carried;
+    const hoursBefore = C.hours();
     st.hoursMod = 0;
     st.morale = U.clamp(st.morale + (st.overtime && !C.inPre() ? -5 : st.morale < 75 ? 2 : 0), 5, 100);
     st.pitched = false;
@@ -451,6 +458,13 @@
     }
     if (out === 'month') restock();
     rollInbox();
+    // A month's plan shrinks to a week's at kickoff; never carry more than a project still needs.
+    const scale = Math.min(1, C.hours() / (hoursBefore || 1));
+    Object.keys(st.alloc).forEach((id) => {
+      const sub = st.robot.subs[id], skill = C.skillOf(id);
+      const left = sub ? C.levelWork(id) - sub.progress : skill.hours - (C.tree().progress[skill.id] || 0);
+      st.alloc[id] = Math.min(Math.round(st.alloc[id] * scale), Math.ceil(left / C.eff(id)));
+    });
     C.sanitizeAlloc();
     return out;
   };
