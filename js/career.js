@@ -63,6 +63,7 @@
     st.period = 'pre'; st.month = 0; st.week = 0; st.hoursMod = 0;
     st.stock = Object.assign({}, D.STOCK_MAX);
     st.fieldKit = null;
+    st.offseason = st.lastRobot ? D.OFFSEASON.map((o) => ({ id: o.id, entered: false, done: false, summary: null })) : [];
     C.autoDriveTeam();
     const goal = D.GOALS[st.goal];
     C.mail('School board', 'Season goal', 'This year the board expects the team to: ' + goal.text.charAt(0).toLowerCase() + goal.text.slice(1) + '. Meeting it earns a ' + U.money(goal.grant) + ' grant.');
@@ -101,6 +102,8 @@
     [9, 9, 10, 10, 10, 11, 11, 12, 9, 10, 11, 12].slice(0, diff.roster).forEach((g) => st.students.push(student(g, 14 + (g - 9) * 5 + diff.skill, 34 + (g - 9) * 7 + diff.skill)));
     (diff.facilities || []).forEach((f) => { st.facilities[f] = true; });
     st.research = { current: null, progress: {}, done: {} };
+    // An established program has last year's robot to take to offseason events.
+    st.lastRobot = diff.veteran ? { game: U.pick(D.SIM).id, perf: { speed: 72, intake: 70, scorer: 70, endgame: 66, auto: 64, rel: 86 } } : null;
     (diff.skills || []).forEach((id) => { st.research.done[id] = true; });
     D.PARTS.forEach((p) => { st.inventory[p.id] = (D.STARTER_PARTS[p.id] || 0) * (diff.parts || 1); });
     st.world = G.World.create(st.team.number);
@@ -181,7 +184,7 @@
   };
   C.canUpgrade = function (subId) {
     const st = G.state, s = st.robot.subs[subId];
-    if (!st.kickoff) return 'Wait for kickoff';
+    if (!st.kickoff && subId !== 'drive') return 'Wait for kickoff';
     if (s.active) return 'In progress';
     if (s.level >= C.concept(subId).max) return 'Maxed out';
     const out = C.soldOut(subId);
@@ -225,6 +228,9 @@
     return Math.round(U.clamp(0.45 * skill + 0.45 * st.practice + 40 * C.mentorBonus('drive') + 5 + (C.has('assist') ? 6 : 0) + (C.has('strategy') ? 5 : 0), 5, 100));
   };
   C.playerPerf = function () {
+    const st = G.state;
+    // Offseason events are played with last season's robot and this year's drive team.
+    if (st.event && st.event.type === 'offseason') return Object.assign({}, st.lastRobot.perf, { driver: C.driverSkill() });
     return { speed: C.stat('drive'), intake: C.stat('intake'), scorer: C.stat('scorer'), endgame: C.stat('endgame'),
       auto: C.stat('software'), rel: Math.round(G.state.robot.rel), driver: C.driverSkill() };
   };
@@ -249,14 +255,14 @@
   /** Team hours available this week. */
   C.hours = function () {
     const st = G.state;
-    const weekly = st.students.length * 5 + 10 + (st.facilities.space ? 6 : 0);
-    // An offseason month is lighter than four build-season weeks.
-    return Math.max(0, (C.inPre() ? Math.round(weekly * 1.5) : weekly + (st.overtime ? 18 : 0)) + (st.hoursMod || 0));
+    const H = D.HOURS, n = st.students.length;
+    const base = C.inPre() ? n * H.perStudentMonth + H.monthBase + (st.facilities.space ? 18 : 0) : n * H.perStudentWeek + H.weekBase + (st.facilities.space ? 6 : 0) + (st.overtime ? 18 : 0);
+    return Math.max(0, base + (st.hoursMod || 0));
   };
   C.used = () => Object.values(G.state.alloc).reduce((a, b) => a + b, 0);
   C.locked = function (id) {
     const st = G.state, sub = st.robot.subs[id];
-    if (sub) return !st.kickoff ? 'Opens at kickoff' : !sub.active ? 'Start an upgrade first' : '';
+    if (sub) return !st.kickoff && id !== 'drive' ? 'Opens at kickoff' : !sub.active ? 'Start an upgrade first' : '';
     if (id === 'test') return Object.values(st.robot.subs).some((s) => s.level > 0) ? '' : 'Nothing to test yet';
     if (id === 'practice') return st.robot.subs.drive.level > 0 ? '' : 'Needs a drivetrain';
     if (id === 'research') return !C.inPre() ? 'Offseason only' : !C.tree().current ? 'Pick a skill first' : '';
@@ -326,6 +332,9 @@
   /** What one hour of each side activity produces. */
   C.RATE = { test: 0.53, practice: 0.59, portfolio: 0.35, outreach: 0.35 };
   C.fundPerHour = () => C.eff('fundraise') * (9.3 + G.state.team.rep * 0.16);
+  /** Fundraising runs out of easy money: hours beyond the cap bring in half as much. */
+  C.fundCap = () => (C.inPre() ? D.HOURS.fundCapMonth : D.HOURS.fundCapWeek);
+  C.fundYield = (hours) => Math.round(C.fundPerHour() * (Math.min(hours, C.fundCap()) + 0.5 * Math.max(0, hours - C.fundCap())));
 
   function grow(k, amount) {
     const s = U.pick(G.state.students);
@@ -364,7 +373,7 @@
       else if (id === 'practice') st.practice = Math.min(100, st.practice + p * C.RATE.practice);
       else if (id === 'portfolio') st.awards.portfolio = Math.min(100, st.awards.portfolio + p * C.RATE.portfolio);
       else if (id === 'outreach') { st.awards.outreach = Math.min(100, st.awards.outreach + p * C.RATE.outreach); C.rep(p * 0.021); }
-      else if (id === 'fundraise') C.earn(Math.round(n * C.fundPerHour()));
+      else if (id === 'fundraise') C.earn(C.fundYield(n));
     });
   }
 
@@ -401,6 +410,7 @@
     if (st.event || st.phase === 'review') return 'blocked';
     if (C.pending()) return 'inbox';
     applyWork();
+    st.alloc = {}; // every turn is planned from scratch
     st.hoursMod = 0;
     st.morale = U.clamp(st.morale + (st.overtime && !C.inPre() ? -5 : st.morale < 75 ? 2 : 0), 5, 100);
     st.pitched = false;
@@ -408,9 +418,10 @@
     if (C.inPre()) {
       st.month++;
       out = 'month';
-      st.alloc = {}; // every month is planned from scratch
       if (st.month === D.VENDOR_MONTH) C.mail('Vendors', 'Summer product launches', 'This year\'s new products are in the Shop: ' + st.vendor.map((id) => D.VENDOR.find((x) => x.id === id).name).join(', ') + '. Parts are also at list price until kickoff.');
       if (st.month === D.MONTHS.length - 1 && !st.fieldKit) C.mail('Field supplier', 'Field preorders close at kickoff', 'Game sets for the new season can be preordered in the Shop until kickoff: ' + U.money(D.FIELD_KITS.half.price) + ' for a half field, ' + U.money(D.FIELD_KITS.full.price) + ' for a full one. After the reveal they cost ' + Math.round(D.FIELD_MARKUP * 100) + '% more and take ' + D.FIELD_DELAY + ' weeks to arrive.');
+      const camp = (st.offseason || []).find((o) => o.entered && !o.done && D.OFFSEASON.find((x) => x.id === o.id).month === st.month);
+      if (camp) { startOffseason(camp); out = 'event'; }
       if (st.month >= D.MONTHS.length) {
         st.period = 'season'; st.week = 1; st.kickoff = true;
         // Kickoff rush: every team orders at once.
@@ -499,8 +510,56 @@
     return true;
   };
 
+  /* ---------- Offseason events ---------- */
+  C.offInfo = (id) => D.OFFSEASON.find((x) => x.id === id);
+  /** '' if the team can sign up for an offseason event, otherwise why not. */
+  C.offLocked = function (id) {
+    const st = G.state, o = (st.offseason || []).find((x) => x.id === id), info = C.offInfo(id);
+    if (!st.lastRobot || !o) return 'No competition robot yet';
+    if (o.done) return 'Played';
+    if (o.entered) return 'Registered';
+    if (!C.inPre() || st.month >= info.month) return 'Registration closed';
+    if (st.team.rep < info.minRep) return 'Needs reputation ' + info.minRep;
+    if (st.team.money < info.fee) return 'Not enough money';
+    return '';
+  };
+  C.enterOffseason = function (id) {
+    if (C.offLocked(id)) return false;
+    const st = G.state, info = C.offInfo(id);
+    C.pay(info.fee);
+    st.offseason.find((x) => x.id === id).entered = true;
+    C.news('Registered for the ' + info.name + ' in ' + D.MONTHS[info.month] + ': ' + U.money(info.fee) + '.');
+    return true;
+  };
+  function startOffseason(o) {
+    const st = G.state, W = G.World, info = C.offInfo(o.id);
+    const byRating = st.world.teams.slice().sort((a, b) => b.rating - a.rating);
+    const pool = info.tier === 'elite' ? byRating.slice(0, 15) : info.tier === 'local' ? U.shuffle(byRating.slice(20)).slice(0, 15) : U.shuffle(byRating).slice(0, 15);
+    const entries = pool.map((t) => W.entry(t, 20));
+    entries.push({ id: 'P', num: st.team.number, name: st.team.name, isPlayer: true });
+    st.event = G.Event.create('offseason', info.name, U.shuffle(entries));
+    st.event.game = st.lastRobot.game;
+    st.event.offId = o.id;
+    st.hoursMod = -st.students.length * 4; // a weekend away
+    C.sanitizeAlloc();
+    C.news('Arrived at the ' + info.name + ' with last season\'s robot.');
+  }
+
   C.finishEvent = function () {
     const st = G.state, ev = st.event, s = ev.summary;
+    if (ev.type === 'offseason') {
+      const o = st.offseason.find((x) => x.id === ev.offId);
+      const rep = { 'Winning Alliance': 2, Finalist: 1.5, Semifinalist: 1 }[s.result] || 0;
+      C.rep(rep);
+      st.morale = U.clamp(st.morale + 3 + rep * 2, 5, 100);
+      st.practice = Math.min(100, st.practice + 8);
+      C.ROLES.forEach((r) => { const d = st.students.find((x) => x.id === st.driveTeam[r]); if (d) d.drive = Math.min(100, d.drive + 3); });
+      if (s.result === 'Winning Alliance') st.banners.push({ season: st.season, text: 'Offseason Champion', sub: ev.name });
+      o.done = true; o.summary = s;
+      C.news(ev.name + ': ranked ' + s.rank + ' of ' + s.of + ' (' + s.record + '), ' + s.result + '. The drive team comes home sharper.');
+      st.event = null;
+      return;
+    }
     const cal = st.calendar.find((c) => c.week === ev.calWeek);
     if (ev.type === 'meet') {
       st.league.stats = ev.stats;
@@ -613,6 +672,7 @@
     st.season++; st.year++; st.phase = 'play'; st.kickoff = false; st.review = null;
     st.flags = {}; st.alloc = {}; st.overtime = false; st.pitched = false;
     st.awards = { portfolio: 0, outreach: Math.round(st.awards.outreach * 0.3) };
+    st.lastRobot = { game: st.game, perf: C.playerPerf() };
     st.practice = Math.round(st.practice * 0.35);
     st.robot = freshRobot();
     G.World.newSeason(st.world);

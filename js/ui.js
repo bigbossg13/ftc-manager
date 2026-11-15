@@ -84,7 +84,7 @@
       const wk = next.week - st.week, free = C.hours() - C.used(), mo = D.MONTHS.length - st.month, pend = C.pending();
       up = '<h2>' + (st.kickoff ? 'Next: ' + next.name : (st.month < 2 ? 'Offseason' : 'Preseason') + ' · ' + C.dateLabel()) + '</h2>' +
         '<p>' + (st.kickoff ? next.name + ' in <b>' + wk + '</b> week' + (wk === 1 ? '' : 's') + ' (entry ' + U.money(next.fee) + ').'
-          : 'Kickoff in <b>' + mo + '</b> month' + (mo === 1 ? '' : 's') + '. Each offseason turn is one month and starts with a blank plan; once the game is revealed you plan week by week.') + '</p>' +
+          : 'Kickoff in <b>' + mo + '</b> month' + (mo === 1 ? '' : 's') + '. Each offseason turn is one month; once the game is revealed you plan week by week. Every turn starts with a blank plan.') + '</p>' +
         (pend ? '<p class="warn">' + pend + ' decision' + (pend === 1 ? ' is' : 's are') + ' waiting in your inbox. ' + btn('Open inbox', 'tab', 'inbox', { cls: 'small' }) + '</p>' : '') +
         '<p>Team hours assigned this ' + C.turn() + ': <b>' + C.used() + ' / ' + C.hours() + ' h</b>' + (free ? ' <span class="warn">(' + free + ' h idle)</span>' : '') + '</p>' + hoursBar(false) +
         '<div class="row" style="margin-top:12px">' + btn('Plan the ' + C.turn(), 'tab', 'build') + btn('Advance ' + C.turn() + ' ▶', 'advance', undefined, { cls: 'primary big' }) + '</div>';
@@ -136,14 +136,14 @@
     }).join('');
     const acts = D.ACTS.map((a) => {
       const per = C.eff(a.id) * 10;
-      const fx = a.id === 'research' ? (C.tree().current ? 'toward ' + D.skill(C.tree().current).name + ', ' + per.toFixed(1) + ' h' : 'no skill picked') : a.id === 'training' ? 'about 3 skill gains' : a.id === 'fundraise' ? '+' + U.money(C.fundPerHour() * 10) : '+' + (per * C.RATE[a.id]).toFixed(1) + ' ' + { test: 'reliability', practice: 'practice', portfolio: 'portfolio', outreach: 'outreach' }[a.id];
+      const fx = a.id === 'research' ? (C.tree().current ? 'toward ' + D.skill(C.tree().current).name + ', ' + per.toFixed(1) + ' h' : 'no skill picked') : a.id === 'training' ? 'about 3 skill gains' : a.id === 'fundraise' ? 'half rate beyond ' + C.fundCap() + ' h; +' + U.money(C.fundPerHour() * 10) : '+' + (per * C.RATE[a.id]).toFixed(1) + ' ' + { test: 'reliability', practice: 'practice', portfolio: 'portfolio', outreach: 'outreach' }[a.id];
       return '<tr><td><b><i class="dot" style="background:' + ACT_COLORS[a.id] + '"></i>' + a.name + '</b><div class="muted">' + a.desc + '</div></td><td class="muted">' + fx + ' per 10 h' + '</td><td class="right">' + stepper(a.id) + '</td></tr>';
     }).join('');
     return '<div class="grid"><div class="card c12"><div class="row spread"><div><h2>This ' + C.turn() + '\'s plan</h2><span class="muted">Team hours assigned: </span><b>' + C.used() + ' / ' + C.hours() + ' h</b></div>' +
-      (C.inPre() ? '<span class="tag">Offseason: one turn is a month</span>' : '<div class="row"><span class="muted">Overtime (+18 h, costs morale)</span>' + seg('overtime', st.overtime ? '1' : '0', [['0', 'Off'], ['1', 'On']]) + '</div>') + '</div>' + hoursBar(true) +
+      (C.inPre() ? '<span class="tag">Offseason month: ' + D.HOURS.perStudentMonth + ' h per student + ' + D.HOURS.monthBase + '</span>' : '<div class="row"><span class="muted">Overtime (+18 h, costs morale)</span>' + seg('overtime', st.overtime ? '1' : '0', [['0', 'Off'], ['1', 'On']]) + '</div>') + '</div>' + hoursBar(true) +
       '<p class="muted" style="margin-top:10px">Type hours into any job, or use − and + for steps of 5. Efficiency is how much standard work one of your hours gets done: ' + effRow + '</p></div>' +
       '<div class="card c12"><h3>Robot' + (st.kickoff ? ' · ' + D.game(st.game).name : '') + '</h3><div class="scroll"><table><tr><th>Subsystem</th><th>Design concept</th><th>Level</th><th>Project</th><th class="right">Hours this ' + C.turn() + '</th></tr>' + subs + '</table></div>' +
-      '<p class="muted" style="margin-top:8px">Advanced concepts need a skill from the Skills page first. Changing a concept halves that subsystem\'s level. Experience with a concept carries into future seasons and makes it quicker to build.</p></div>' +
+      '<p class="muted" style="margin-top:8px">The drivetrain can be started in the offseason, before the game is known; everything else waits for kickoff. Advanced concepts need a skill from the Skills page first. Changing a concept halves that subsystem\'s level. Experience with a concept carries into future seasons and makes it quicker to build.</p></div>' +
       '<div class="card c8"><h3>Other work</h3><div class="scroll"><table>' + acts + '</table></div></div>' +
       '<div class="card c4"><h3>Readiness</h3>' + stat('Reliability', st.robot.rel, relCls(st.robot.rel)) + stat('Practice', st.practice, 'b') + stat('Portfolio', st.awards.portfolio, 'g') + stat('Outreach', st.awards.outreach, 'g') +
       '<p class="muted" style="margin-top:8px">Unreliable robots jam, brown out or drop off the field entirely. Judges read the portfolio and outreach record for awards.</p></div></div>';
@@ -268,6 +268,19 @@
     return '<div style="max-width:760px"><p class="muted">Decisions marked in orange need an answer before the calendar can move on.</p>' + (list || '<div class="card">Nothing yet.</div>') + '</div>';
   }
 
+  /* ---------- Offseason events (shown on the Season page) ---------- */
+  function offCard() {
+    const st = G.state;
+    if (!st.lastRobot) return '<div class="card c12"><h3>Offseason events</h3><p class="muted">Summer tournaments are played with last season\'s robot. Your team does not have one yet, so these open up after your first season.</p></div>';
+    const rows = D.OFFSEASON.map((info) => {
+      const o = st.offseason.find((x) => x.id === info.id), why = C.offLocked(info.id), s = o && o.summary;
+      return '<tr><td><b>' + info.name + '</b><div class="muted">' + info.desc + '</div></td><td>' + D.MONTHS[info.month] + '</td><td class="num">' + U.money(info.fee) + '</td><td class="right">' +
+        (s ? 'Rank ' + s.rank + '/' + s.of + ' · ' + s.result : !why ? btn('Sign up', 'offseason', info.id, { cls: 'small primary' }) : '<span class="tag ' + (why === 'Registered' ? 'a' : '') + '">' + why + '</span>') + '</td></tr>';
+    }).join('');
+    return '<div class="card c12"><h3>Offseason events</h3><div class="scroll"><table><tr><th>Event</th><th>Month</th><th>Entry</th><th></th></tr>' + rows + '</table></div>' +
+      '<p class="muted" style="margin-top:8px">Played with last season\'s robot in ' + D.game(st.lastRobot.game).name + ', with this year\'s drive team. Sign up before the month it is held. Each one costs a weekend of team hours and gives the drive team practice and experience; a win hangs a banner.</p></div>';
+  }
+
   /* ---------- Season ---------- */
   function season() {
     const st = G.state, next = C.nextEvent();
@@ -283,6 +296,7 @@
     return '<div class="grid"><div class="card c12"><h3>Season ' + st.season + ' (' + C.yearLabel(st.year) + ') calendar</h3><div class="timeline"><div class="' + (st.kickoff ? '' : 'next') + '"><div class="muted">September</div><b>Kickoff</b><div class="muted">' + (st.kickoff ? D.game(st.game).name : 'Game reveal') + '</div></div>' + cal + '</div></div>' +
       '<div class="card c7"><h3>The game</h3>' + (st.kickoff ? '<h2>' + D.game(st.game).name + '</h2>' + gameInfo(D.game(st.game)) : '<p class="muted">Revealed at kickoff.</p>') + '</div>' +
       '<div class="card c5"><h3>Top programs in your region</h3><div class="scroll"><table><tr><th>Team</th><th>Strength</th><th></th></tr>' + rivals + '</table></div></div>' +
+      offCard() +
       '<div class="card c12"><h3>Banners</h3>' + (st.banners.length ? '<div class="banners">' + st.banners.map((b) => '<div class="banner"><b>' + b.text + '</b><span>' + b.sub + '</span><span>Season ' + b.season + '</span></div>').join('') + '</div>' : '<p class="muted">Win an event, the Inspire Award or the Compass Award to hang a banner here.</p>') + '</div>' +
       (hist ? '<div class="card c12"><h3>Team history</h3><div class="scroll"><table>' + hist + '</table></div></div>' : '') + '</div>';
   }
@@ -303,7 +317,7 @@
   const nums = (ev, ids) => ids.map((id) => E.team(ev, id).num).join(' · ');
 
   function eventMain(ev) {
-    const st = G.state, g = D.game(st.game);
+    const st = G.state, g = D.game(ev.game || st.game);
     if (UI.live) {
       const m = UI.live.match, p = V.player() || UI.live.m.robots.find((r) => r.isPlayer);
       return '<h2>' + m.label + '</h2>' + scoreHead(0, 0, [nums(ev, m.red), nums(ev, m.blue)]) + '<canvas id="field"></canvas>' +
@@ -344,6 +358,8 @@
     const s = ev.summary;
     if (ev.type === 'meet') return '<h2>' + ev.name + ' complete</h2><table><tr><td>Record at this meet</td><td class="right"><b>' + s.record + '</b></td></tr><tr><td>League standing</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + '</td></tr></table>' +
       '<p class="muted" style="margin-top:10px">League meets have no playoffs or awards. Your standing carries into the League Tournament.</p><div class="row" style="margin-top:14px">' + btn('Pack up and head home ▶', 'leave', undefined, { cls: 'primary big' }) + '</div>';
+    if (ev.type === 'offseason') return '<h2>' + ev.name + ' complete</h2><table><tr><td>Qualification rank</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + ' (' + s.record + ')</td></tr><tr><td>Playoffs</td><td class="right"><b>' + s.result + '</b></td></tr></table>' +
+      '<p class="muted" style="margin-top:10px">Offseason events have no judged awards and nothing rides on them, but the drive team gains practice and experience.</p><div class="row" style="margin-top:14px">' + btn('Pack up and head home ▶', 'leave', undefined, { cls: 'primary big' }) + '</div>';
     return '<h2>' + ev.name + ' complete</h2><table><tr><td>Qualification rank</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + ' (' + s.record + ')</td></tr><tr><td>Playoffs</td><td class="right"><b>' + s.result + '</b></td></tr>' +
       '<tr><td>Awards</td><td class="right">' + (s.awards.length ? '<b>' + s.awards.join(', ') + '</b>' : 'None') + '</td></tr>' +
       (ev.type !== 'worlds' ? '<tr><td>Advancement</td><td class="right">' + (s.advanced ? '<b class="good">Advanced!</b>' : 'Did not advance') + '</td></tr>' : '') + '</table>' +
@@ -373,7 +389,7 @@
       '<li><b>Build and compete:</b> Qualifiers in weeks ' + D.WEEKS.q1 + ' and ' + D.WEEKS.q2 + ' (or, in a league region, three meets and a League Tournament). Advance from either to the Regional Championship (week ' + D.WEEKS.regional + '), and from there to the World Championship (week ' + D.WEEKS.worlds + '). You keep improving the robot between events.</li></ul>' +
       '<h2>Building the robot</h2><ul><li>Each week the team has a pool of <b>hours</b>, shown as one bar. Split them between subsystem projects and other jobs by typing hours in.</li><li>Every project has a <b>standard number of hours</b>. Your efficiency in that discipline (skills, mentors, equipment, morale) decides how much of it one of your hours gets done.</li><li>Pick a <b>design concept</b> per subsystem. Simple concepts are cheap and fast but top out early. Advanced ones cost more money and work.</li>' +
       '<li>Every upgrade costs <b>reliability</b>. Spend hours on Test & Tune before an event or watch your robot die on the field.</li><li><b>Driver practice</b> makes cycles faster and penalties rarer.</li></ul>' +
-      '<h2>Parts and the inbox</h2><ul><li>Every upgrade is built from <b>parts</b>. Starting an upgrade uses what is in your inventory and buys the rest. Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more once the season starts, and vendors can <b>sell out</b> of a part for a week, most often right after kickoff. Stock up over the summer.</li><li>The <b>skill tree</b> is studied in the offseason, one skill at a time. Skills are permanent: some make work go further, and the advanced design concepts cannot be built without theirs.</li><li><b>Field kits</b> are this season\'s game elements to practise on. Preorder one in the Shop before kickoff; afterwards they cost ' + Math.round(D.FIELD_MARKUP * 100) + '% more and take ' + D.FIELD_DELAY + ' weeks to arrive.</li><li>Leftover parts carry over, and half of the parts on last year\'s robot are salvaged.</li><li>The <b>inbox</b> brings decisions: sponsor requests, breakdowns, student issues. You must answer them before the calendar moves on.</li></ul><h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
+      '<h2>Parts and the inbox</h2><ul><li>Every upgrade is built from <b>parts</b>. Starting an upgrade uses what is in your inventory and buys the rest. Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more once the season starts, and vendors can <b>sell out</b> of a part for a week, most often right after kickoff. Stock up over the summer.</li><li>The <b>skill tree</b> is studied in the offseason, one skill at a time. Skills are permanent: some make work go further, and the advanced design concepts cannot be built without theirs.</li><li><b>Offseason events</b> on the Season page are optional summer tournaments played with last season\'s robot. Sign up before the month they are held. The <b>drivetrain</b> is the one subsystem you can start building before kickoff.</li><li><b>Field kits</b> are this season\'s game elements to practise on. Preorder one in the Shop before kickoff; afterwards they cost ' + Math.round(D.FIELD_MARKUP * 100) + '% more and take ' + D.FIELD_DELAY + ' weeks to arrive.</li><li>Leftover parts carry over, and half of the parts on last year\'s robot are salvaged.</li><li>The <b>inbox</b> brings decisions: sponsor requests, breakdowns, student issues. You must answer them before the calendar moves on.</li></ul><h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
       '<li>Playoffs are best-of-three semifinals and a final.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. Nominate a mentor on the Team screen for the Compass Award. A great portfolio and outreach record can carry a team with an average robot.</li>' +
       '<li>During a live match you can make <b>coach calls</b>: push for speed at the risk of breakdowns and penalties, play it safe, or send the robot to the endgame early.</li></ul>' +
       '<h2>The long game</h2><ul><li>Meeting your season goal brings a grant and reputation. Reputation unlocks better sponsors, mentors and recruits.</li><li>Seniors graduate. Train the younger students before you need them.</li></ul>' +
@@ -427,6 +443,7 @@
     decide(v) { const [id, i] = v.split(':'); C.decide(id, +i); },
     part(v) { const [id, n] = v.split(':'); C.buyPart(id, +n); },
     kit(v) { C.buyKit(v); },
+    offseason(v) { C.enterOffseason(v); },
     study(v) { C.study(v); },
     mode(v) { UI.mode = v; },
     game(v) { UI.game = v; },

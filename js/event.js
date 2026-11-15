@@ -3,8 +3,8 @@
   'use strict';
   const U = G.U, D = G.Data;
   const E = (G.Event = {});
-  const SLOTS = { qual: 6, league: 5, regional: 5, worlds: 0 };
-  const ROUNDS = { qual: 5, meet: 5, league: 5, regional: 6, worlds: 6 };
+  const SLOTS = { qual: 6, league: 5, regional: 5, worlds: 0, offseason: 0 };
+  const ROUNDS = { qual: 5, meet: 5, league: 5, regional: 6, worlds: 6, offseason: 4 };
 
   /** entries: [{ id, num, name, perf?, port, out, isPlayer? }], count divisible by 4 */
   E.create = function (type, name, entries, carried) {
@@ -33,7 +33,7 @@
 
   /** Build a live match object for a schedule/playoff entry. */
   E.build = function (ev, m, plan) {
-    return G.Match.create(D.game(G.state.game), m.red.map((id) => entry(ev, id, plan)), m.blue.map((id) => entry(ev, id, plan)), Math.floor(G.rand() * 4294967296));
+    return G.Match.create(D.game(ev.game || G.state.game), m.red.map((id) => entry(ev, id, plan)), m.blue.map((id) => entry(ev, id, plan)), Math.floor(G.rand() * 4294967296));
   };
 
   /** Record a finished match and move the event forward. */
@@ -109,17 +109,18 @@
       ev.feed.push(name + ': ' + E.team(ev, best).num + ' ' + E.team(ev, best).name);
     };
     ev.awards = [];
-    give('Inspire Award', (id, i) => 0.36 * val(id, 'port') + 0.34 * val(id, 'out') + 30 * (1 - i / n));
-    give('Think Award', (id) => val(id, 'port'));
-    give('Connect Award', (id) => val(id, 'out'));
-    give('Design Award', (id) => robot(id));
+    const judged = ev.type !== 'offseason'; // offseason events are robot-only
+    if (judged) give('Inspire Award', (id, i) => 0.36 * val(id, 'port') + 0.34 * val(id, 'out') + 30 * (1 - i / n));
+    if (judged) give('Think Award', (id) => val(id, 'port'));
+    if (judged) give('Connect Award', (id) => val(id, 'out'));
+    if (judged) give('Design Award', (id) => robot(id));
     // Compass Award: recognises an adult mentor, so it does not use up a team award.
     const nominee = G.state.mentors.find((x) => x.name === G.state.compass);
     done.length = 0;
-    give('Compass Award', (id) => (E.team(ev, id).isPlayer ? (nominee ? nominee.skill * 11 + val(id, 'out') * 0.45 : -99) : val(id, 'out') * 0.5 + val(id, 'port') * 0.3));
+    if (judged) give('Compass Award', (id) => (E.team(ev, id).isPlayer ? (nominee ? nominee.skill * 11 + val(id, 'out') * 0.45 : -99) : val(id, 'out') * 0.5 + val(id, 'port') * 0.3));
 
     const f = ev.series[2], win = f.wa === 2 ? f.a : f.b, lose = f.wa === 2 ? f.b : f.a;
-    const adv = [ev.awards[0].id].concat(ev.alliances[win], ev.alliances[lose], [ev.awards[1].id], order);
+    const adv = judged ? [ev.awards[0].id].concat(ev.alliances[win], ev.alliances[lose], [ev.awards[1].id], order) : [];
     adv.forEach((id) => { if (ev.advancing.length < SLOTS[ev.type] && !ev.advancing.includes(id)) ev.advancing.push(id); });
 
     const ai = ev.alliances.findIndex((a) => a.includes('P'));
