@@ -44,7 +44,7 @@
   /* ---------- chrome ---------- */
   function top() {
     const st = G.state, pend = C.pending();
-    const tabs = [['hq', 'HQ'], ['inbox', 'Inbox' + (pend ? ' (' + pend + ')' : '')], ['build', 'Build'], ['team', 'Team'], ['sponsors', 'Sponsors'], ['inventory', 'Inventory'], ['shop', 'Shop'], ['workshop', 'Workshop'], ['season', 'Season']];
+    const tabs = [['hq', 'HQ'], ['inbox', 'Inbox' + (pend ? ' (' + pend + ')' : '')], ['build', 'Build'], ['skills', 'Skills'], ['team', 'Team'], ['sponsors', 'Sponsors'], ['inventory', 'Inventory'], ['shop', 'Shop'], ['workshop', 'Workshop'], ['season', 'Season']];
     if (st.event) tabs.push(['event', 'Event ●']);
     tabs.push(['help', 'How to play']);
     const adv = st.event ? btn('Go to event', 'tab', 'event', { cls: 'primary' })
@@ -84,7 +84,7 @@
       const wk = next.week - st.week, free = C.hours() - C.used(), mo = D.MONTHS.length - st.month, pend = C.pending();
       up = '<h2>' + (st.kickoff ? 'Next: ' + next.name : (st.month < 2 ? 'Offseason' : 'Preseason') + ' · ' + C.dateLabel()) + '</h2>' +
         '<p>' + (st.kickoff ? next.name + ' in <b>' + wk + '</b> week' + (wk === 1 ? '' : 's') + ' (entry ' + U.money(next.fee) + ').'
-          : 'Kickoff in <b>' + mo + '</b> month' + (mo === 1 ? '' : 's') + '. Each offseason turn is one month; once the game is revealed you plan week by week.') + '</p>' +
+          : 'Kickoff in <b>' + mo + '</b> month' + (mo === 1 ? '' : 's') + '. Each offseason turn is one month and starts with a blank plan; once the game is revealed you plan week by week.') + '</p>' +
         (pend ? '<p class="warn">' + pend + ' decision' + (pend === 1 ? ' is' : 's are') + ' waiting in your inbox. ' + btn('Open inbox', 'tab', 'inbox', { cls: 'small' }) + '</p>' : '') +
         '<p>Team hours assigned this ' + C.turn() + ': <b>' + C.used() + ' / ' + C.hours() + ' h</b>' + (free ? ' <span class="warn">(' + free + ' h idle)</span>' : '') + '</p>' + hoursBar(false) +
         '<div class="row" style="margin-top:12px">' + btn('Plan the ' + C.turn(), 'tab', 'build') + btn('Advance ' + C.turn() + ' ▶', 'advance', undefined, { cls: 'primary big' }) + '</div>';
@@ -104,7 +104,7 @@
       '<input class="hrs" type="number" min="0" step="1" inputmode="numeric" aria-label="Hours" data-c="hours" data-v="' + id + '" value="' + n + '"><span class="muted">h</span>' +
       btn('+', 'alloc', id + ':5', { off: C.used() >= C.hours(), title: 'Add 5 hours' }) + '</span>';
   }
-  const ACT_COLORS = { drive: '#f57e25', intake: '#f0c33d', scorer: '#e5484d', endgame: '#d6409f', software: '#8e6cf0', test: '#3e7bfa', practice: '#2bb8c4', portfolio: '#46c37b', outreach: '#9bd44a', fundraise: '#c9a36b', training: '#9aa5b8' };
+  const ACT_COLORS = { research: '#ffffff', drive: '#f57e25', intake: '#f0c33d', scorer: '#e5484d', endgame: '#d6409f', software: '#8e6cf0', test: '#3e7bfa', practice: '#2bb8c4', portfolio: '#46c37b', outreach: '#9bd44a', fundraise: '#c9a36b', training: '#9aa5b8' };
   const actName = (id) => (D.sub(id) || D.ACTS.find((a) => a.id === id)).name;
   /** The week's team hours as one stacked bar, a segment per job. */
   function hoursBar(legend) {
@@ -131,22 +131,41 @@
           '<div class="muted">Needs ' + Object.keys(need).map((id) => '<span class="' + (short[id] ? 'warn' : '') + '">' + need[id] + '× ' + D.part(id).name + '</span>').join(', ') + '</div>';
       }
       return '<tr><td><b><i class="dot" style="background:' + ACT_COLORS[s.id] + '"></i>' + s.name + '</b><div class="muted">' + s.stat + ' ' + C.stat(s.id) + '</div></td>' +
-        '<td><select data-c="concept" data-v="' + s.id + '">' + s.concepts.map((x) => '<option value="' + x.id + '"' + (x.id === c.id ? ' selected' : '') + '>' + C.conceptName(s.id, x) + ' (max ' + (x.base + x.per * x.max) + ')</option>').join('') + '</select><div class="muted">' + c.desc + '</div></td>' +
+        '<td><select data-c="concept" data-v="' + s.id + '">' + s.concepts.map((x) => { const lock = C.conceptLocked(x.id); return '<option value="' + x.id + '"' + (x.id === c.id ? ' selected' : '') + (lock ? ' disabled' : '') + '>' + C.conceptName(s.id, x) + (lock ? ' (needs ' + lock + ')' : ' (max ' + (x.base + x.per * x.max) + ')') + '</option>'; }).join('') + '</select><div class="muted">' + c.desc + '</div></td>' +
         '<td>' + pips(r.level, c.max) + '<div class="muted">Level ' + r.level + ' / ' + c.max + '</div></td><td style="min-width:170px">' + proj + '</td><td class="right">' + stepper(s.id) + '</td></tr>';
     }).join('');
     const acts = D.ACTS.map((a) => {
       const per = C.eff(a.id) * 10;
-      const fx = a.id === 'training' ? 'about 3 skill gains' : a.id === 'fundraise' ? '+' + U.money(C.fundPerHour() * 10) : '+' + (per * C.RATE[a.id]).toFixed(1) + ' ' + { test: 'reliability', practice: 'practice', portfolio: 'portfolio', outreach: 'outreach' }[a.id];
+      const fx = a.id === 'research' ? (C.tree().current ? 'toward ' + D.skill(C.tree().current).name + ', ' + per.toFixed(1) + ' h' : 'no skill picked') : a.id === 'training' ? 'about 3 skill gains' : a.id === 'fundraise' ? '+' + U.money(C.fundPerHour() * 10) : '+' + (per * C.RATE[a.id]).toFixed(1) + ' ' + { test: 'reliability', practice: 'practice', portfolio: 'portfolio', outreach: 'outreach' }[a.id];
       return '<tr><td><b><i class="dot" style="background:' + ACT_COLORS[a.id] + '"></i>' + a.name + '</b><div class="muted">' + a.desc + '</div></td><td class="muted">' + fx + ' per 10 h' + '</td><td class="right">' + stepper(a.id) + '</td></tr>';
     }).join('');
     return '<div class="grid"><div class="card c12"><div class="row spread"><div><h2>This ' + C.turn() + '\'s plan</h2><span class="muted">Team hours assigned: </span><b>' + C.used() + ' / ' + C.hours() + ' h</b></div>' +
       (C.inPre() ? '<span class="tag">Offseason: one turn is a month</span>' : '<div class="row"><span class="muted">Overtime (+18 h, costs morale)</span>' + seg('overtime', st.overtime ? '1' : '0', [['0', 'Off'], ['1', 'On']]) + '</div>') + '</div>' + hoursBar(true) +
       '<p class="muted" style="margin-top:10px">Type hours into any job, or use − and + for steps of 5. Efficiency is how much standard work one of your hours gets done: ' + effRow + '</p></div>' +
       '<div class="card c12"><h3>Robot' + (st.kickoff ? ' · ' + D.game(st.game).name : '') + '</h3><div class="scroll"><table><tr><th>Subsystem</th><th>Design concept</th><th>Level</th><th>Project</th><th class="right">Hours this ' + C.turn() + '</th></tr>' + subs + '</table></div>' +
-      '<p class="muted" style="margin-top:8px">Changing a concept halves that subsystem\'s level. Experience with a concept carries into future seasons and makes it quicker to build.</p></div>' +
+      '<p class="muted" style="margin-top:8px">Advanced concepts need a skill from the Skills page first. Changing a concept halves that subsystem\'s level. Experience with a concept carries into future seasons and makes it quicker to build.</p></div>' +
       '<div class="card c8"><h3>Other work</h3><div class="scroll"><table>' + acts + '</table></div></div>' +
       '<div class="card c4"><h3>Readiness</h3>' + stat('Reliability', st.robot.rel, relCls(st.robot.rel)) + stat('Practice', st.practice, 'b') + stat('Portfolio', st.awards.portfolio, 'g') + stat('Outreach', st.awards.outreach, 'g') +
       '<p class="muted" style="margin-top:8px">Unreliable robots jam, brown out or drop off the field entirely. Judges read the portfolio and outreach record for awards.</p></div></div>';
+  }
+
+  /* ---------- Skills ---------- */
+  function skills() {
+    const st = G.state, t = C.tree(), pre = C.inPre();
+    const learned = D.SKILLS.filter((k) => t.done[k.id]).length;
+    const cols = Object.keys(D.BRANCHES).map((b) => '<div class="branch"><h3>' + D.BRANCHES[b] + '</h3>' + D.SKILLS.filter((k) => k.branch === b).map((k) => {
+      const done = t.done[k.id], cur = t.current === k.id, lock = C.skillLocked(k.id), prog = t.progress[k.id] || 0;
+      return '<div class="node ' + (done ? 'done' : cur ? 'cur' : lock ? 'lock' : '') + (k.req ? ' child' : '') + '"><b>' + k.name + '</b><div class="muted">' + k.desc + '</div>' +
+        (done ? '<span class="tag a">Learned</span>'
+          : '<div class="muted" style="margin-top:6px">' + Math.floor(prog) + ' / ' + k.hours + ' h</div>' + bar(prog / k.hours * 100) +
+            '<div style="margin-top:8px">' + (cur ? '<span class="tag a">Studying now</span>' : lock ? '<span class="tag">' + lock + '</span>' : btn(prog ? 'Resume' : 'Study this', 'study', k.id, { cls: 'small primary' })) + '</div>') + '</div>';
+    }).join('') + '</div>').join('');
+    const cur = t.current ? D.skill(t.current) : null;
+    return '<div class="grid"><div class="card c12"><div class="row spread"><div><h2>Skill development</h2><span class="muted">' + learned + ' of ' + D.SKILLS.length + ' skills learned. Study happens in the offseason, one skill at a time; switching keeps the hours already put in.</span></div>' +
+      (pre ? '' : '<span class="tag">In season: study resumes in ' + D.MONTHS[0] + '</span>') + '</div>' +
+      (pre ? '<div class="row" style="margin-top:12px"><span>' + (cur ? 'Studying <b>' + cur.name + '</b> at ×' + C.eff('research').toFixed(2) + ' efficiency. Hours this month:' : 'Pick a skill below, then give it hours.') + '</span>' + (cur ? stepper('research') : '') +
+        '<span class="muted">' + (C.hours() - C.used()) + ' h unassigned</span></div>' : '') + '</div>' +
+      '<div class="card c12"><div class="tree">' + cols + '</div></div></div>';
   }
 
   /* ---------- Team ---------- */
@@ -354,7 +373,7 @@
       '<li><b>Build and compete:</b> Qualifiers in weeks ' + D.WEEKS.q1 + ' and ' + D.WEEKS.q2 + ' (or, in a league region, three meets and a League Tournament). Advance from either to the Regional Championship (week ' + D.WEEKS.regional + '), and from there to the World Championship (week ' + D.WEEKS.worlds + '). You keep improving the robot between events.</li></ul>' +
       '<h2>Building the robot</h2><ul><li>Each week the team has a pool of <b>hours</b>, shown as one bar. Split them between subsystem projects and other jobs by typing hours in.</li><li>Every project has a <b>standard number of hours</b>. Your efficiency in that discipline (skills, mentors, equipment, morale) decides how much of it one of your hours gets done.</li><li>Pick a <b>design concept</b> per subsystem. Simple concepts are cheap and fast but top out early. Advanced ones cost more money and work.</li>' +
       '<li>Every upgrade costs <b>reliability</b>. Spend hours on Test & Tune before an event or watch your robot die on the field.</li><li><b>Driver practice</b> makes cycles faster and penalties rarer.</li></ul>' +
-      '<h2>Parts and the inbox</h2><ul><li>Every upgrade is built from <b>parts</b>. Starting an upgrade uses what is in your inventory and buys the rest. Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more once the season starts, and vendors can <b>sell out</b> of a part for a week, most often right after kickoff. Stock up over the summer.</li><li><b>Field kits</b> are this season\'s game elements to practise on. Preorder one in the Shop before kickoff; afterwards they cost ' + Math.round(D.FIELD_MARKUP * 100) + '% more and take ' + D.FIELD_DELAY + ' weeks to arrive.</li><li>Leftover parts carry over, and half of the parts on last year\'s robot are salvaged.</li><li>The <b>inbox</b> brings decisions: sponsor requests, breakdowns, student issues. You must answer them before the calendar moves on.</li></ul><h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
+      '<h2>Parts and the inbox</h2><ul><li>Every upgrade is built from <b>parts</b>. Starting an upgrade uses what is in your inventory and buys the rest. Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more once the season starts, and vendors can <b>sell out</b> of a part for a week, most often right after kickoff. Stock up over the summer.</li><li>The <b>skill tree</b> is studied in the offseason, one skill at a time. Skills are permanent: some make work go further, and the advanced design concepts cannot be built without theirs.</li><li><b>Field kits</b> are this season\'s game elements to practise on. Preorder one in the Shop before kickoff; afterwards they cost ' + Math.round(D.FIELD_MARKUP * 100) + '% more and take ' + D.FIELD_DELAY + ' weeks to arrive.</li><li>Leftover parts carry over, and half of the parts on last year\'s robot are salvaged.</li><li>The <b>inbox</b> brings decisions: sponsor requests, breakdowns, student issues. You must answer them before the calendar moves on.</li></ul><h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
       '<li>Playoffs are best-of-three semifinals and a final.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. Nominate a mentor on the Team screen for the Compass Award. A great portfolio and outreach record can carry a team with an average robot.</li>' +
       '<li>During a live match you can make <b>coach calls</b>: push for speed at the risk of breakdowns and penalties, play it safe, or send the robot to the endgame early.</li></ul>' +
       '<h2>The long game</h2><ul><li>Meeting your season goal brings a grant and reputation. Reputation unlocks better sponsors, mentors and recruits.</li><li>Seniors graduate. Train the younger students before you need them.</li></ul>' +
@@ -383,7 +402,7 @@
     return '';
   }
 
-  const screens = { hq, inbox, build, workshop, team, sponsors, inventory, shop, season, event: eventScreen, help };
+  const screens = { hq, inbox, build, skills, workshop, team, sponsors, inventory, shop, season, event: eventScreen, help };
 
   UI.render = function () {
     if (!G.state) {
@@ -408,6 +427,7 @@
     decide(v) { const [id, i] = v.split(':'); C.decide(id, +i); },
     part(v) { const [id, n] = v.split(':'); C.buyPart(id, +n); },
     kit(v) { C.buyKit(v); },
+    study(v) { C.study(v); },
     mode(v) { UI.mode = v; },
     game(v) { UI.game = v; },
     format(v) { UI.format = v; },

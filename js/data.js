@@ -249,8 +249,36 @@
     { id: 'portfolio', name: 'Engineering Portfolio', skill: 'biz', desc: 'Documents your season for the judges (Inspire, Think).' },
     { id: 'outreach', name: 'Outreach', skill: 'biz', desc: 'Builds reputation, recruits and the Connect award case.' },
     { id: 'fundraise', name: 'Fundraising', skill: 'biz', desc: 'Car washes, bake sales and grant writing.' },
-    { id: 'training', name: 'Skills Training', skill: null, desc: 'Workshops that raise student skills for the long run.' },
+    { id: 'training', name: 'Student Training', skill: null, desc: 'Workshops that raise individual students\' skills for the long run.' },
+    { id: 'research', name: 'Skill Development', skill: null, desc: 'Offseason study toward the skill picked on the Skills page.' },
   ];
+
+  /* ---- Skill tree: team know-how studied in the offseason, one skill at a time.
+     Each skill needs the one named in req first. Skills are kept for good. ---- */
+  const sk = (id, branch, name, hours, req, desc) => ({ id, branch, name, hours, req, desc });
+  D.BRANCHES = { mech: 'Mechanical', soft: 'Software', drive: 'Drive Team & Pit', biz: 'Business' };
+  D.SKILLS = [
+    sk('cad', 'mech', 'CAD & Design Reviews', 40, null, 'Mechanical projects take 10% fewer hours.'),
+    sk('fab', 'mech', 'Custom Fabrication', 60, 'cad', 'Upgrades knock reliability down 40% less.'),
+    sk('swerve', 'mech', 'Swerve Drive Design', 90, 'fab', 'Unlocks the Coaxial Swerve drivetrain.'),
+    sk('mechs', 'mech', 'Advanced Mechanisms', 90, 'fab', 'Unlocks the advanced intake, scoring and endgame concepts.'),
+    sk('vcs', 'soft', 'Version Control & Code Reviews', 30, null, 'Software projects take 15% fewer hours.'),
+    sk('paths', 'soft', 'Path Following', 60, 'vcs', '+5 Auto once software is started.'),
+    sk('vision', 'soft', 'Computer Vision', 90, 'paths', 'Unlocks the Vision + Dead Wheels software concept.'),
+    sk('assist', 'soft', 'Driver-Assist Automation', 80, 'paths', '+6 drive team rating.'),
+    sk('drills', 'drive', 'Structured Drive Practice', 30, null, 'Driver practice is 25% more effective.'),
+    sk('checklists', 'drive', 'Pit Crew Checklists', 50, 'drills', 'Test & Tune is 25% more effective and reliability can reach 99.'),
+    sk('strategy', 'drive', 'Match Strategy', 70, 'drills', '+5 drive team rating.'),
+    sk('brand', 'biz', 'Team Branding', 30, null, 'Outreach is 25% more effective.'),
+    sk('deck', 'biz', 'Sponsor Pitch Deck', 50, 'brand', 'Sponsor pitches are 15 points more likely to succeed.'),
+    sk('grants', 'biz', 'Grant Writing', 60, 'brand', 'Fundraising brings in 30% more.'),
+    sk('judging', 'biz', 'Portfolio & Judging Prep', 60, 'brand', 'Portfolio work is 30% more effective.'),
+  ];
+  D.skill = (id) => D.SKILLS.find((x) => x.id === id);
+  /* Design concepts that need a skill before the team can build them. */
+  D.CONCEPT_REQ = { swerve: 'swerve', active: 'mechs', s3: 'mechs', fast: 'mechs', vision: 'vision' };
+  /* Skills that make an activity's hours go further. */
+  D.SKILL_EFF = { practice: ['drills', 0.25], test: ['checklists', 0.25], outreach: ['brand', 0.25], fundraise: ['grants', 0.3], portfolio: ['judging', 0.3] };
 
   /* ---- Season field kits: this year's game elements to practise on. Preordered
      kits arrive at kickoff; later orders cost more and take time to ship. ---- */
@@ -356,7 +384,7 @@
   ];
   /* Starting situations. skill is added to every starting student's skills. */
   D.DIFFICULTY = {
-    dynasty: { name: 'Powerhouse Dynasty', money: 10000, rep: 62, skill: 28, roster: 12, parts: 4, facilities: ['printer', 'field'], desc: 'A decorated program with veterans, a field perimeter and sponsors who expect Worlds.' },
+    dynasty: { name: 'Powerhouse Dynasty', money: 10000, rep: 62, skill: 28, roster: 12, parts: 4, facilities: ['printer', 'field'], skills: ['cad', 'fab', 'vcs', 'paths', 'drills', 'brand'], desc: 'A decorated program with veterans, a field perimeter and sponsors who expect Worlds.' },
     easy: { name: 'Well-Funded Rookie', money: 5000, rep: 22, skill: 0, roster: 8, desc: 'A supportive school and a starter grant.' },
     normal: { name: 'Garage Team', money: 3000, rep: 15, skill: 0, roster: 8, desc: 'A kit of parts, a folding table and big plans.' },
     hard: { name: 'Shoestring', money: 1500, rep: 8, skill: 0, roster: 8, desc: 'Borrowed tools and no sponsors. Good luck.' },
