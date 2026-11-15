@@ -19,7 +19,7 @@ The game autosaves to the browser's local storage.
 - **Parts inventory and shop.** Upgrades are built from parts. Parts are cheaper in the offseason and can sell out once the season starts; leftovers carry over and half of last year's robot is salvaged.
 - **Field preorders.** Preorder a half or full set of the season's game elements before kickoff to practise on; ordering after the reveal costs 40% more and takes two weeks to arrive.
 - **Offseason events.** Optional summer tournaments played with last season's robot; the drivetrain can also be started before kickoff.
-- **Skill tree.** Fifteen team skills across mechanical, software, drive team and business, studied in the offseason one at a time. Some make work go further; the advanced design concepts need theirs first.
+- **Skill tree.** Fifteen team skills across mechanical, software, drive team and business, studied with team hours in or out of season, several at once if you like. Some make work go further; the advanced design concepts need theirs first.
 - **Inbox.** Decisions land on your desk (sponsor requests, breakdowns, student issues) and must be answered before the calendar moves on.
 - **Mentors cost money.** Each mentor has per-season expenses, billed when they join and every offseason.
 - **Robot design.** Five subsystems (drivetrain, intake, scoring mechanism, endgame, software), each with three design concepts that trade cost and build time against their ceiling. Experience with a concept carries into later seasons.

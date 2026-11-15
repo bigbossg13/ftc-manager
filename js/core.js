@@ -1,7 +1,7 @@
 /* FTC Manager — core: namespace, RNG, helpers, save system */
 (function (root) {
   'use strict';
-  const G = (root.FTC = { VERSION: '0.9.0' });
+  const G = (root.FTC = { VERSION: '0.10.0' });
   const SAVE_KEY = 'ftc-manager-save-v4';
 
   /** Small seeded PRNG (mulberry32). Returns a function producing floats in [0,1). */

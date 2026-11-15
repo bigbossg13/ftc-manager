@@ -250,11 +250,11 @@
     { id: 'outreach', name: 'Outreach', skill: 'biz', desc: 'Builds reputation, recruits and the Connect award case.' },
     { id: 'fundraise', name: 'Fundraising', skill: 'biz', desc: 'Car washes, bake sales and grant writing.' },
     { id: 'training', name: 'Student Training', skill: null, desc: 'Workshops that raise individual students\' skills for the long run.' },
-    { id: 'research', name: 'Skill Development', skill: null, desc: 'Offseason study toward the skill picked on the Skills page.' },
   ];
 
-  /* ---- Skill tree: team know-how studied in the offseason, one skill at a time.
-     Each skill needs the one named in req first. Skills are kept for good. ---- */
+  /* ---- Skill tree: team know-how, studied with hours like any other job, in or
+     out of season, several at once if you like. Each skill needs the one named
+     in req first. Skills are kept for good. ---- */
   const sk = (id, branch, name, hours, req, desc) => ({ id, branch, name, hours, req, desc });
   D.BRANCHES = { mech: 'Mechanical', soft: 'Software', drive: 'Drive Team & Pit', biz: 'Business' };
   D.SKILLS = [

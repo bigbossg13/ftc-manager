@@ -21,11 +21,11 @@ function botWeek() {
   st.alloc = {};
   (st.offseason || []).forEach((o) => { if (st.team.money > 1500) C.enterOffseason(o.id); });
   if (C.inPre()) { C.startUpgrade('drive'); C.setAlloc('drive', 30); }
-  if (C.inPre() && !C.tree().current) { const k = D.SKILLS.find((x) => !C.skillLocked(x.id)); if (k) C.study(k.id); }
-  if (!st.kickoff) { C.setAlloc('fundraise', 18); C.setAlloc('research', 40); C.setAlloc('training', 999); return; }
+  if (!st.kickoff) { C.setAlloc('fundraise', 18); D.SKILLS.filter((x) => !C.skillLocked(x.id)).slice(0, 2).forEach((x) => C.setAlloc(C.skillKey(x.id), 25)); C.setAlloc('training', 999); return; }
   D.SUBS.forEach((s) => C.startUpgrade(s.id));
   const active = D.SUBS.filter((s) => st.robot.subs[s.id].active).map((s) => s.id);
   C.setAlloc('test', st.robot.rel < 75 ? 12 : 6);
+  { const k = D.SKILLS.find((x) => !C.skillLocked(x.id)); if (k) C.setAlloc(C.skillKey(k.id), 4); }
   C.setAlloc('practice', 6);
   C.setAlloc('portfolio', 6);
   if (st.team.money < 600) C.setAlloc('fundraise', 12);

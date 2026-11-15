@@ -210,7 +210,10 @@
     if (k.req && !C.has(k.req)) return 'Needs ' + D.skill(k.req).name;
     return '';
   };
-  C.study = function (id) { const t = C.tree(); if (C.skillLocked(id)) return false; t.current = id; C.sanitizeAlloc(); return true; };
+  /* Hours on a skill are planned under the key 'sk_<id>'. */
+  C.skillKey = (id) => 'sk_' + id;
+  C.skillOf = (key) => (key.indexOf('sk_') === 0 ? D.skill(key.slice(3)) : null);
+  C.studyHours = () => Object.keys(G.state.alloc).reduce((a, k) => a + (C.skillOf(k) ? G.state.alloc[k] : 0), 0);
   /** Name of the skill a design concept needs, or '' if the team can build it. */
   C.conceptLocked = (conceptId) => { const req = D.CONCEPT_REQ[conceptId]; return req && !C.has(req) ? D.skill(req).name : ''; };
 
@@ -265,7 +268,7 @@
     if (sub) return !st.kickoff && id !== 'drive' ? 'Opens at kickoff' : !sub.active ? 'Start an upgrade first' : '';
     if (id === 'test') return Object.values(st.robot.subs).some((s) => s.level > 0) ? '' : 'Nothing to test yet';
     if (id === 'practice') return st.robot.subs.drive.level > 0 ? '' : 'Needs a drivetrain';
-    if (id === 'research') return !C.inPre() ? 'Offseason only' : !C.tree().current ? 'Pick a skill first' : '';
+    if (C.skillOf(id)) return C.skillLocked(C.skillOf(id).id);
     return '';
   };
   C.setAlloc = function (id, delta) {
@@ -278,7 +281,11 @@
   C.setHours = function (id, value) { C.setAlloc(id, (Math.round(+value) || 0) - (G.state.alloc[id] || 0)); };
   C.sanitizeAlloc = function () {
     const st = G.state;
-    Object.keys(st.alloc).forEach((id) => { if (C.locked(id)) st.alloc[id] = 0; });
+    Object.keys(st.alloc).forEach((id) => {
+      // Drop anything this version does not know (plans from older saves).
+      if (!st.robot.subs[id] && !D.ACTS.some((a) => a.id === id) && !C.skillOf(id)) delete st.alloc[id];
+      else if (C.locked(id)) st.alloc[id] = 0;
+    });
     let over = C.used() - C.hours();
     Object.keys(st.alloc).reverse().forEach((id) => { const cut = Math.min(over, st.alloc[id]); if (cut > 0) { st.alloc[id] -= cut; over -= cut; } });
   };
@@ -291,10 +298,10 @@
   const FAC = {
     drive: { printer: 0.1, cnc: 0.15 }, intake: { printer: 0.1, cnc: 0.15 }, scorer: { printer: 0.1, cnc: 0.15 }, endgame: { printer: 0.1, cnc: 0.15 },
     software: { sensors: 0.2, laptops: 0.1 }, test: { field: 0.3 }, practice: { field: 0.3 }, portfolio: { laptops: 0.1 },
-    outreach: { pit: 0.15 }, fundraise: { pit: 0.15 }, training: {}, research: {},
+    outreach: { pit: 0.15 }, fundraise: { pit: 0.15 }, training: {},
   };
   /** Equipment bonus for a job, as a fraction (0.25 = +25%). */
-  C.facBonus = (id) => Object.keys(FAC[id]).reduce((a, f) => a + (G.state.facilities[f] ? FAC[id][f] : 0), 0) + (C.kitActive() ? D.FIELD_KITS[G.state.fieldKit.type].bonus[id] || 0 : 0);
+  C.facBonus = (id) => Object.keys(FAC[id] || {}).reduce((a, f) => a + (G.state.facilities[f] ? FAC[id][f] : 0), 0) + (C.kitActive() ? D.FIELD_KITS[G.state.fieldKit.type].bonus[id] || 0 : 0);
 
   /* ---------- Season field kit ---------- */
   /** True once this season's game elements are in the workshop. */
@@ -320,7 +327,7 @@
     C.news(pre ? D.FIELD_KITS[type].name + ' preordered. It ships at kickoff.' : D.FIELD_KITS[type].name + ' ordered. It arrives in week ' + st.fieldKit.arrives + '.');
     return true;
   };
-  C.actSkill = (id) => (id === 'research' ? (C.tree().current ? D.skill(C.tree().current).branch : null) : D.sub(id) ? D.sub(id).skill : D.ACTS.find((a) => a.id === id).skill);
+  C.actSkill = (id) => (C.skillOf(id) ? C.skillOf(id).branch : D.sub(id) ? D.sub(id).skill : D.ACTS.find((a) => a.id === id).skill);
   /** Efficiency: how much progress one assigned hour makes (1.0 = one standard hour). */
   C.eff = function (id) {
     const st = G.state, k = C.actSkill(id);
@@ -361,13 +368,14 @@
           st.knowledge[key] = Math.max(st.knowledge[key] || 0, sub.level);
           C.news(D.sub(id).name + ' upgraded to level ' + sub.level + ' (' + C.conceptName(id) + ').');
         }
-      } else if (id === 'research') {
-        const t = C.tree(), k = D.skill(t.current);
+      } else if (C.skillOf(id)) {
+        const t = C.tree(), k = C.skillOf(id);
         t.progress[k.id] = (t.progress[k.id] || 0) + p;
         if (t.progress[k.id] >= k.hours) {
-          t.done[k.id] = true; t.current = null; st.alloc.research = 0;
+          t.done[k.id] = true; st.alloc[id] = 0;
+          const next = D.SKILLS.filter((x) => x.req === k.id).map((x) => x.name);
           C.news('The team has learned ' + k.name + '. ' + k.desc);
-          C.mail('Team captain', 'New skill: ' + k.name, k.desc + ' Pick the next skill to study on the Skills page.');
+          C.mail('Team captain', 'New skill: ' + k.name, k.desc + (next.length ? ' This opens up ' + next.join(' and ') + '.' : ''));
         }
       } else if (id === 'test') st.robot.rel = Math.min(C.has('checklists') ? 99 : 96, st.robot.rel + p * C.RATE.test);
       else if (id === 'practice') st.practice = Math.min(100, st.practice + p * C.RATE.practice);
