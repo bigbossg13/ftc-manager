@@ -230,12 +230,30 @@
     const skill = val('driver') * 0.5 + val('operator') * 0.25 + val('coach') * 0.15 + val('human') * 0.1;
     return Math.round(U.clamp(0.45 * skill + 0.45 * st.practice + 40 * C.mentorBonus('drive') + 5 + (C.has('assist') ? 6 : 0) + (C.has('strategy') ? 5 : 0), 5, 100));
   };
+  /* ---------- Event crew: students not on the drive team scout or work the pit ---------- */
+  C.crewPool = () => Math.max(0, G.state.students.length - C.ROLES.length);
+  /** Scouts in the stands; the rest of the crew stays in the pit. */
+  C.scouts = function () { const st = G.state, pool = C.crewPool(); return U.clamp(st.scouts == null ? Math.ceil(pool / 2) : st.scouts, 0, pool); };
+  C.eventScouts = () => { const ev = G.state.event; return ev && ev.scouts != null ? U.clamp(ev.scouts, 0, C.crewPool()) : C.scouts(); };
+  C.setScouts = function (delta) {
+    const st = G.state, ev = st.event;
+    if (ev && ev.crewLocked) return false;
+    st.scouts = U.clamp(C.scouts() + delta, 0, C.crewPool());
+    if (ev) ev.scouts = st.scouts;
+    return true;
+  };
+  /** Scouting accuracy, 0-100: more scouts and the Match Scouting skill see more clearly. */
+  C.scoutAccuracy = (scouts) => U.clamp(25 + 7 * (scouts == null ? C.eventScouts() : scouts) + (C.has('scouting') ? 25 : 0), 0, 100);
+  /** Reliability gained at an event from students keeping the robot running. */
+  C.pitBonus = () => Math.round((C.crewPool() - C.eventScouts()) * 1.5);
+
   C.playerPerf = function () {
     const st = G.state;
     // Offseason events are played with last season's robot and this year's drive team.
-    if (st.event && st.event.type === 'offseason') return Object.assign({}, st.lastRobot.perf, { driver: C.driverSkill() });
+    const pit = st.event ? C.pitBonus() : 0;
+    if (st.event && st.event.type === 'offseason') return Object.assign({}, st.lastRobot.perf, { rel: Math.min(99, st.lastRobot.perf.rel + pit), driver: C.driverSkill() });
     return { speed: C.stat('drive'), intake: C.stat('intake'), scorer: C.stat('scorer'), endgame: C.stat('endgame'),
-      auto: C.stat('software'), rel: Math.round(G.state.robot.rel), driver: C.driverSkill() };
+      auto: C.stat('software'), rel: Math.min(99, Math.round(G.state.robot.rel + pit)), driver: C.driverSkill() };
   };
   C.ROLES = ['driver', 'operator', 'coach', 'human'];
   C.ROLE_NAMES = { driver: 'Driver', operator: 'Operator', coach: 'Drive Coach', human: 'Human Player' };
@@ -407,6 +425,7 @@
     } else entries = W.elite(39).map((t) => W.entry(t, st.week));
     entries.push({ id: 'P', num: st.team.number, name: st.team.name, isPlayer: true });
     st.event = G.Event.create(cal.type, cal.name, U.shuffle(entries), carried);
+    st.event.scouts = C.scouts();
     st.event.calWeek = cal.week;
     C.news('Arrived at the ' + cal.name + '. Entry and travel: ' + U.money(cal.fee) + '.');
   }
@@ -560,6 +579,7 @@
     const entries = pool.map((t) => W.entry(t, 20));
     entries.push({ id: 'P', num: st.team.number, name: st.team.name, isPlayer: true });
     st.event = G.Event.create('offseason', info.name, U.shuffle(entries));
+    st.event.scouts = C.scouts();
     st.event.game = st.lastRobot.game;
     st.event.offId = o.id;
     st.hoursMod = -st.students.length * 4; // a weekend away

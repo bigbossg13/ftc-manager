@@ -39,7 +39,7 @@ function playEvent() {
   for (;;) {
     const r = G.Event.advance(ev);
     if (r.need === 'done') break;
-    if (r.need === 'pick') { ev.playerPick = r.options[0]; continue; }
+    if (r.need === 'pick') { ev.playerPick = G.Event.recommend(ev, r.options)[0].id; continue; }
     const res = G.Match.run(G.Event.build(ev, r.match, G.state.plan));
     scores.push(res.r, res.b);
     G.Event.complete(ev, r.match, res);

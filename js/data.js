@@ -269,6 +269,7 @@
     sk('drills', 'drive', 'Structured Drive Practice', 30, null, 'Driver practice is 25% more effective.'),
     sk('checklists', 'drive', 'Pit Crew Checklists', 50, 'drills', 'Test & Tune is 25% more effective and reliability can reach 99.'),
     sk('strategy', 'drive', 'Match Strategy', 70, 'drills', '+5 drive team rating.'),
+    sk('scouting', 'drive', 'Match Scouting', 40, 'drills', 'Scouting reports at events are much more accurate.'),
     sk('brand', 'biz', 'Team Branding', 30, null, 'Outreach is 25% more effective.'),
     sk('deck', 'biz', 'Sponsor Pitch Deck', 50, 'brand', 'Sponsor pitches are 15 points more likely to succeed.'),
     sk('grants', 'biz', 'Grant Writing', 60, 'brand', 'Fundraising brings in 30% more.'),

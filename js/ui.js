@@ -309,8 +309,9 @@
   }
   function allianceCard(ev, ids, side) {
     return '<div class="al-card ' + (side ? 'b' : '') + '"><h3 class="' + (side ? 'bluec' : 'redc') + '">' + (side ? 'Blue' : 'Red') + ' alliance</h3>' + ids.map((id) => {
-      const t = E.team(ev, id), s = ev.stats[id];
-      return '<div style="margin:6px 0">' + tname(t) + (t.isPlayer ? ' <span class="tag a">you</span>' : '') + '<div class="muted">' + s.w + '-' + s.l + '-' + s.t + ' · avg ' + (s.n ? E.avg(ev, id).toFixed(0) + ' pts' : 'unknown') + '</div></div>';
+      const t = E.team(ev, id), s = ev.stats[id], sc = t.isPlayer ? null : E.scout(ev, id);
+      return '<div style="margin:6px 0">' + tname(t) + (t.isPlayer ? ' <span class="tag a">you</span>' : '') + '<div class="muted">' + s.w + '-' + s.l + '-' + s.t + ' · avg ' + (s.n ? E.avg(ev, id).toFixed(0) + ' pts' : 'unknown') +
+        (sc ? ' · scouted ' + sc.power + ' (auto ' + sc.auto + ', teleop ' + sc.tele + ', endgame ' + sc.end + ')' : '') + '</div></div>';
     }).join('') + '</div>';
   }
   function scoreHead(r, b, sub) {
@@ -355,9 +356,14 @@
         (m.kind === 'qual' ? btn(ev.type === 'meet' ? 'Sim the rest of the meet' : 'Sim to alliance selection', 'simQuals', undefined, { cls: 'big', title: 'Simulate every remaining qualification match with this match plan' }) : '') + '</div>';
     }
     if (need.need === 'pick') {
-      const order = E.rankings(ev);
-      return note + '<h2>Alliance selection</h2><p>You are captain of <b>Alliance ' + need.seed + '</b>. Pick your partner for the playoffs.</p><div class="scroll"><table><tr><th>Rank</th><th>Team</th><th>Record</th><th>Avg pts</th><th></th></tr>' +
-        need.options.map((id) => { const t = E.team(ev, id), s = ev.stats[id]; return '<tr><td class="num">' + (order.indexOf(id) + 1) + '</td><td>' + tname(t) + '</td><td class="num">' + s.w + '-' + s.l + '-' + s.t + '</td><td class="num">' + E.avg(ev, id).toFixed(1) + '</td><td class="right">' + btn('Pick', 'pick', id, { cls: 'small primary' }) + '</td></tr>'; }).join('') + '</table></div>';
+      const order = E.rankings(ev), recs = E.recommend(ev, need.options), acc = C.scoutAccuracy(ev.scouts);
+      const cell = (v) => '<td class="num">' + (v == null ? '?' : v) + '</td>';
+      return note + '<h2>Alliance selection</h2><p>You are captain of <b>Alliance ' + need.seed + '</b>. Pick your partner for the playoffs.</p>' +
+        '<p class="muted">Sorted by your scouts\' recommendation. Scouting accuracy at this event: <b>' + acc + '%</b>' + (acc < 50 ? ', so treat these numbers with caution' : '') + '. Ratings are out of 100; "?" means nobody watched that team.</p>' +
+        '<div class="scroll"><table><tr><th></th><th>Team</th><th>Rank</th><th>Record</th><th>Avg pts</th><th>Auto</th><th>Teleop</th><th>Endgame</th><th>Reliab.</th><th></th></tr>' +
+        recs.map((r, i) => { const t = E.team(ev, r.id), s = ev.stats[r.id], sc = r.scout || {};
+          return '<tr class="' + (i === 0 ? 'me' : '') + '"><td>' + (i < 3 ? '<span class="tag a">#' + (i + 1) + '</span>' : '') + '</td><td>' + tname(t) + (i < 3 ? '<div class="muted">' + r.reason + '</div>' : '') + '</td><td class="num">' + (order.indexOf(r.id) + 1) + '</td><td class="num">' + s.w + '-' + s.l + '-' + s.t + '</td><td class="num">' + E.avg(ev, r.id).toFixed(1) + '</td>' +
+            cell(sc.auto) + cell(sc.tele) + cell(sc.end) + cell(sc.rel) + '<td class="right">' + btn('Pick', 'pick', r.id, { cls: 'small ' + (i === 0 ? 'primary' : '') }) + '</td></tr>'; }).join('') + '</table></div>';
     }
     const s = ev.summary;
     if (ev.type === 'meet') return note + '<h2>' + ev.name + ' complete</h2><table><tr><td>Record at this meet</td><td class="right"><b>' + s.record + '</b></td></tr><tr><td>League standing</td><td class="right"><b>' + s.rank + '</b> of ' + s.of + '</td></tr></table>' +
@@ -371,6 +377,14 @@
       '<div class="row" style="margin-top:14px">' + btn('Pack up and head home ▶', 'leave', undefined, { cls: 'primary big' }) + '</div>';
   }
 
+  function crewCard(ev) {
+    const pool = C.crewPool(), sc = C.eventScouts(), lock = ev.crewLocked;
+    return '<div class="card" style="margin-bottom:14px"><h3>Event crew</h3><div class="row spread"><span><b>' + sc + '</b> scouting · <b>' + (pool - sc) + '</b> in the pit</span>' +
+      '<span class="step">' + btn('−', 'crew', -1, { off: lock || sc <= 0, title: 'Move a scout to the pit' }) + btn('+', 'crew', 1, { off: lock || sc >= pool, title: 'Send a pit crew member to scout' }) + '</span></div>' +
+      '<table style="margin-top:6px"><tr><td>Scouting accuracy</td><td class="right num"><b>' + C.scoutAccuracy(sc) + '%</b></td></tr><tr><td>Pit crew</td><td class="right num"><b>+' + C.pitBonus() + '</b> reliability</td></tr></table>' +
+      '<p class="muted" style="margin-top:6px">' + (lock ? 'Locked in for this event.' : 'Set before your first match; it stays for the event.') + ' The ' + pool + ' students not on the drive team make up the crew.</p></div>';
+  }
+
   function eventScreen() {
     const ev = G.state.event;
     if (!ev) return '<div class="card">No event in progress.</div>';
@@ -382,7 +396,7 @@
         '<table style="margin-top:8px">' + ev.series.filter((s) => s.a >= 0).map((s) => '<tr><td>' + s.name + '</td><td class="num right">A' + (s.a + 1) + ' <b>' + s.wa + ' - ' + s.wb + '</b> A' + (s.b + 1) + '</td></tr>').join('') + '</table></div>';
     }
     return '<div class="grid"><div class="card c8"><div class="muted">' + ev.name + ' · ' + ev.teams.length + ' teams</div>' + eventMain(ev) + '</div>' +
-      '<div class="c4">' + bracket + '<div class="card" style="margin-bottom:14px"><h3>Rankings</h3><div style="max-height:380px;overflow:auto"><table><tr><th>#</th><th>Team</th><th>W-L-T</th><th>RP</th><th>Avg</th></tr>' + ranks + '</table></div></div>' +
+      '<div class="c4">' + bracket + crewCard(ev) + '<div class="card" style="margin-bottom:14px"><h3>Rankings</h3><div style="max-height:380px;overflow:auto"><table><tr><th>#</th><th>Team</th><th>W-L-T</th><th>RP</th><th>Avg</th></tr>' + ranks + '</table></div></div>' +
       (ev.feed.length ? '<div class="card"><h3>Event feed</h3><ul class="news">' + ev.feed.slice().reverse().map((f) => '<li>' + e(f) + '</li>').join('') + '</ul></div>' : '') + '</div></div>';
   }
 
@@ -394,7 +408,7 @@
       '<h2>Building the robot</h2><ul><li>Each week the team has a pool of <b>hours</b>, shown as one bar. Split them between subsystem projects and other jobs by typing hours in.</li><li>Every project has a <b>standard number of hours</b>. Your efficiency in that discipline (skills, mentors, equipment, morale) decides how much of it one of your hours gets done.</li><li>Pick a <b>design concept</b> per subsystem. Simple concepts are cheap and fast but top out early. Advanced ones cost more money and work.</li>' +
       '<li>Every upgrade costs <b>reliability</b>. Spend hours on Test & Tune before an event or watch your robot die on the field.</li><li><b>Driver practice</b> makes cycles faster and penalties rarer.</li></ul>' +
       '<h2>Parts and the inbox</h2><ul><li>Every upgrade is built from <b>parts</b>. Starting an upgrade uses what is in your inventory and buys the rest. Parts cost ' + Math.round(D.IN_SEASON_MARKUP * 100) + '% more once the season starts, and vendors can <b>sell out</b> of a part for a week, most often right after kickoff. Stock up over the summer.</li><li>The <b>skill tree</b> on the Skills page is studied with team hours, in or out of season, and you can split hours across several skills at once. Skills are permanent: some make work go further, and the advanced design concepts cannot be built without theirs.</li><li><b>Offseason events</b> on the Season page are optional summer tournaments played with last season\'s robot. Sign up before the month they are held. The <b>drivetrain</b> is the one subsystem you can start building before kickoff.</li><li><b>Field kits</b> are this season\'s game elements to practise on. Preorder one in the Shop before kickoff; afterwards they cost ' + Math.round(D.FIELD_MARKUP * 100) + '% more and take ' + D.FIELD_DELAY + ' weeks to arrive.</li><li>Leftover parts carry over, and half of the parts on last year\'s robot are salvaged.</li><li>The <b>inbox</b> brings decisions: sponsor requests, breakdowns, student issues. You must answer them before the calendar moves on.</li></ul><h2>Events</h2><ul><li>Matches are 2 v 2: 30 seconds of autonomous, then two minutes of driving, with endgame tasks in the last 30 seconds.</li><li>Win = 2 ranking points, tie = 1. The top four teams become alliance captains and pick a partner each.</li>' +
-      '<li>Playoffs are best-of-three semifinals and a final.</li><li>You can watch a match, quick-sim it, or simulate every remaining qualification match at once and pick the event up at alliance selection.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. Nominate a mentor on the Team screen for the Compass Award. A great portfolio and outreach record can carry a team with an average robot.</li>' +
+      '<li>Students who are not on the drive team form your <b>event crew</b>. Split them between scouts, who make your reports on other teams more accurate, and the pit, where each adds reliability. If you finish as a captain, the scouts recommend who to pick.</li><li>Playoffs are best-of-three semifinals and a final.</li><li>You can watch a match, quick-sim it, or simulate every remaining qualification match at once and pick the event up at alliance selection.</li><li>Advancement goes to the Inspire Award winner, the winning and finalist alliances, the Think Award winner, then by rank. Nominate a mentor on the Team screen for the Compass Award. A great portfolio and outreach record can carry a team with an average robot.</li>' +
       '<li>During a live match you can make <b>coach calls</b>: push for speed at the risk of breakdowns and penalties, play it safe, or send the robot to the endgame early.</li></ul>' +
       '<h2>The long game</h2><ul><li>Meeting your season goal brings a grant and reputation. Reputation unlocks better sponsors, mentors and recruits.</li><li>Seniors graduate. Train the younger students before you need them.</li></ul>' +
       '<h2>Save</h2><p>The game autosaves in this browser after every action.</p><div class="row">' + btn('Delete save and return to menu', 'wipe') + '</div></div>';
@@ -447,6 +461,7 @@
     decide(v) { const [id, i] = v.split(':'); C.decide(id, +i); },
     part(v) { const [id, n] = v.split(':'); C.buyPart(id, +n); },
     kit(v) { C.buyKit(v); },
+    crew(v) { C.setScouts(+v); },
     offseason(v) { C.enterOffseason(v); },
     mode(v) { UI.mode = v; },
     game(v) { UI.game = v; },

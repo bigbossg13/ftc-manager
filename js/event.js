@@ -9,7 +9,8 @@
   /** entries: [{ id, num, name, perf?, port, out, isPlayer? }], count divisible by 4 */
   E.create = function (type, name, entries, carried) {
     const ev = { type, name, teams: entries, stage: 'quals', mi: 0, schedule: [], stats: {}, feed: [],
-      sel: null, alliances: null, series: null, awards: null, advancing: [], summary: null, playerPick: null };
+      sel: null, alliances: null, series: null, awards: null, advancing: [], summary: null, playerPick: null,
+      scoutSeed: Math.floor(G.rand() * 1e9), scouts: null, crewLocked: false };
     // League play: standings carry over from earlier meets.
     entries.forEach((t) => { ev.stats[t.id] = Object.assign({ w: 0, l: 0, t: 0, rp: 0, pf: 0, n: 0, contrib: 0 }, carried && carried[t.id]); });
     ev.before = Object.assign({}, ev.stats.P);
@@ -39,6 +40,7 @@
   /** Record a finished match and move the event forward. */
   E.complete = function (ev, m, res) {
     m.res = { r: res.r, b: res.b };
+    if (E.hasPlayer(m)) ev.crewLocked = true; // the event crew is set once you have played
     if (m.kind === 'qual') {
       [m.red, m.blue].forEach((al, side) => al.forEach((id) => {
         const s = ev.stats[id], mine = side ? res.b : res.r, theirs = side ? res.r : res.b;
@@ -55,6 +57,40 @@
         ev.feed.push(s.name + ': Alliance ' + (w + 1) + ' wins ' + Math.max(s.wa, s.wb) + '-' + Math.min(s.wa, s.wb));
       }
     }
+  };
+
+  /* ---------- Scouting ---------- */
+  /** What your scouts believe about a team: the truth blurred by how good the
+      scouting is and how few matches they have watched. null if unseen. */
+  E.scout = function (ev, id) {
+    const t = E.team(ev, id), n = ev.stats[id].n;
+    if (!n) return null;
+    const p = t.isPlayer ? G.Career.playerPerf() : t.perf;
+    const acc = G.Career.scoutAccuracy(ev.scouts);
+    const rng = G.Rng((ev.scoutSeed || 1) + ev.teams.indexOf(t) * 7919);
+    const amp = t.isPlayer ? 0 : (100 - acc) / 100 * 34 / Math.sqrt(n);
+    const see = (v) => Math.round(G.U.clamp(v + (rng() * 2 - 1) * amp, 0, 100));
+    const r = { auto: see(p.auto), tele: see((p.speed + p.intake + p.scorer) / 3), end: see(p.endgame), rel: see(p.rel), seen: n };
+    r.power = Math.round(0.2 * r.auto + 0.5 * r.tele + 0.2 * r.end + 0.1 * r.rel);
+    return r;
+  };
+  /** Rank pick options for the player's alliance, best fit first, each with a reason. */
+  E.recommend = function (ev, options) {
+    const me = G.Career.playerPerf();
+    const maxAvg = Math.max.apply(null, options.map((id) => E.avg(ev, id)).concat([1]));
+    // What stands out about a team is measured against the rest of the teams on offer.
+    const seen = options.map((id) => E.scout(ev, id)).filter(Boolean), mean = {};
+    ['auto', 'tele', 'end', 'rel'].forEach((k) => { mean[k] = seen.reduce((a, x) => a + x[k], 0) / (seen.length || 1); });
+    return options.map((id) => {
+      const s = E.scout(ev, id);
+      // With nothing scouted, fall back on the public numbers everyone can see.
+      if (!s) return { id, score: E.avg(ev, id) / maxAvg * 50, reason: 'Not scouted: going on match results alone', scout: null };
+      // A partner who covers what your robot lacks is worth more than raw strength.
+      const fit = 0.1 * Math.max(0, s.end - me.endgame) + 0.1 * Math.max(0, s.auto - me.auto);
+      const best = [['auto', 'Strong autonomous'], ['tele', 'Fast teleop cycles'], ['end', 'Strong endgame'], ['rel', 'Rarely breaks down']].sort((a, b) => (s[b[0]] - mean[b[0]]) - (s[a[0]] - mean[a[0]]))[0];
+      const covers = s.end - me.endgame > 15 ? 'Covers your endgame' : s.auto - me.auto > 15 ? 'Covers your autonomous' : best[1];
+      return { id, score: s.power + fit, reason: covers, scout: s };
+    }).sort((a, b) => b.score - a.score);
   };
 
   E.rankings = function (ev) {
